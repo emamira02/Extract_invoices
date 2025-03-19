@@ -1,3 +1,4 @@
+# streamlit_app.py
 import streamlit as st
 import json
 from backend import analyze_receipt
@@ -71,40 +72,6 @@ else:
             return None
 
 
-    def main():
-
-        uploaded_file = st.file_uploader("Carica un file PDF", type=["pdf"])
-
-        if uploaded_file is not None:
-            st.write("File caricato con successo!")
-
-            temporary_file_path = handle_file_upload(uploaded_file)
-            if temporary_file_path:
-                with st.spinner("Analizzando il documento..."):
-                    extracted_data = analyze_receipt(open(temporary_file_path, "rb"))
-                    os.remove(temporary_file_path)  # Clean up the temporary file
-
-                if extracted_data:
-                    st.header("Dati Estratti")
-
-                    # Visualizza i dati estratti in forma editabile
-                    edited_data = edit_data(extracted_data)
-
-                    # Visualizza i dati editati
-                    st.subheader("Dati Editati")
-                    st.write(edited_data)
-
-                    # Scarica i dati in formato JSON
-                    st.download_button(
-                        label="Scarica i dati in formato JSON",
-                        data=json.dumps(edited_data, indent=4, ensure_ascii=False).encode('utf-8'),
-                        file_name="extracted_data.json",
-                        mime="application/json",
-                    )
-                else:
-                    st.error("Impossibile estrarre i dati dal documento.")
-
-
     def edit_data(data):
         """Visualizza e permette di editare i dati estratti."""
 
@@ -124,3 +91,35 @@ else:
         data["Lista di prodotti"] = edited_df.to_dict("records")  # Aggiorna i dati con le modifiche
 
         return data
+
+    # Directly execute the code that was inside main()
+    uploaded_file = st.file_uploader("Carica un file PDF", type=["pdf"])
+
+    if uploaded_file is not None:
+        st.write("File caricato con successo!")
+
+        temporary_file_path = handle_file_upload(uploaded_file)
+        if temporary_file_path:
+            with st.spinner("Analizzando il documento..."):
+                extracted_data = analyze_receipt(open(temporary_file_path, "rb"))
+                os.remove(temporary_file_path)  # Clean up the temporary file
+
+            if extracted_data:
+                st.header("Dati Estratti")
+
+                # Visualizza i dati estratti in forma editabile
+                edited_data = edit_data(extracted_data)
+
+                # Visualizza i dati editati
+                st.subheader("Dati Editati")
+                st.write(edited_data)
+
+                # Scarica i dati in formato JSON
+                st.download_button(
+                    label="Scarica i dati in formato JSON",
+                    data=json.dumps(edited_data, indent=4, ensure_ascii=False).encode('utf-8'),
+                    file_name="extracted_data.json",
+                    mime="application/json",
+                )
+            else:
+                st.error("Impossibile estrarre i dati dal documento.")
