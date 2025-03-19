@@ -1,4 +1,6 @@
 streamlit
-pypdf
+azure-ai-documentintelligence
 python-dotenv
 requests
+pandas
+pypdf
