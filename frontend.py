@@ -43,5 +43,5 @@ else:
         logging.info(f"User {st.experimental_user.name} ({st.experimental_user.email}) successfully logged in.")
 
 #diamo un titolo alla nostra app, come presentazione usando qualche parametro per la grafica
-    st.markdown("# Summarize a :red[PDF] with :red-background[one click]")
+    st.markdown("# Scanner a :red[PDF] with :blue-background[Azure AI]")
 
