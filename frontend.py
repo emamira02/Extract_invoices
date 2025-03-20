@@ -1,10 +1,9 @@
-# streamlit_app.py
 import streamlit as st
 import json
-from backend import analyze_receipt
 import logging
 import pandas as pd
 import os
+from backend import analyze_receipt
 
 # Configurazione della pagina
 st.set_page_config(
@@ -76,16 +75,27 @@ else:
         """Visualizza e permette di editare i dati estratti."""
 
         # Campi singoli
-        data["Nome Venditore"] = st.text_input("Nome Venditore", value=data.get("Nome Venditore", ""))
-        data["Indirizzo Venditore"] = st.text_input("Indirizzo Venditore", value=data.get("Indirizzo Venditore", ""))
-        data["Numero di telefono Venditore"] = st.text_input("Numero di telefono Venditore", value=data.get("Numero di telefono Venditore", ""))
-        data["Data"] = st.text_input("Data", value=data.get("Data", ""))
-        data["PIVA"] = st.text_input("PIVA", value=data.get("PIVA", ""))
-        data["Totale"] = st.text_input("Totale", value=data.get("Totale", ""))
+        data["Nome Venditore"] = st.text_input("Nome Venditore", value=data.get("Nome Venditore", "N/A"))
+        data["Indirizzo Venditore"] = st.text_input("Indirizzo Venditore", value=data.get("Indirizzo Venditore", "N/A"))
+        data["Numero di telefono Venditore"] = st.text_input("Numero di telefono Venditore", value=data.get("Numero di telefono Venditore", "N/A"))
+        data["Data"] = st.text_input("Data", value=data.get("Data", "N/A"))
+        data["PIVA"] = st.text_input("PIVA", value=data.get("PIVA", "N/A"))
+        data["Totale"] = st.text_input("Totale", value=data.get("Totale", "N/A"))
 
         # Lista di prodotti (visualizzata come tabella editabile)
         st.subheader("Lista di Prodotti")
-        df = pd.DataFrame(data["Lista di prodotti"])
+        df = pd.DataFrame(data.get("Lista di prodotti", [])) # Handle case where 'Lista di prodotti' is missing
+
+        # Assicurati che le colonne siano presenti anche se la lista è vuota
+        if df.empty:
+            df = pd.DataFrame({
+                "Descrizione": ["N/A"],
+                "Quantità": ["N/A"],
+                "Costo unitario": ["N/A"],
+                "Costo totale": ["N/A"],
+                "Codice prodotto": ["N/A"]
+            })
+
         edited_df = st.data_editor(df, num_rows="dynamic")  # Mostra come tabella editabile
 
         data["Lista di prodotti"] = edited_df.to_dict("records")  # Aggiorna i dati con le modifiche
@@ -101,7 +111,15 @@ else:
         temporary_file_path = handle_file_upload(uploaded_file)
         if temporary_file_path:
             with st.spinner("Analizzando il documento..."):
-                extracted_data = analyze_receipt(open(temporary_file_path, "rb"))
+                try:
+                    with open(temporary_file_path, "rb") as f:  # Open the file in binary read mode
+                        file_content = f.read()
+                        extracted_data = analyze_receipt(file_content)
+                except Exception as e:
+                    logging.error(f"Error during document analysis: {e}")
+                    st.error(f"Error during document analysis: {e}")
+                    extracted_data = None
+
                 os.remove(temporary_file_path)  # Clean up the temporary file
 
             if extracted_data:

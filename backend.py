@@ -1,106 +1,110 @@
-# backend.py
 import os
-from dotenv import load_dotenv
-from azure.ai.documentintelligence import DocumentIntelligenceClient
+import configparser
+import base64
+from urllib.parse import urlparse
 from azure.core.credentials import AzureKeyCredential
-from pypdf import PdfReader
-import logging
-import time
+from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 
-load_dotenv()
+def client():
+    config = configparser.ConfigParser()
+    config.read('client.ini')
+    api_key = config.get('DocumentAI', 'api_key')
+    endpoint = config.get('DocumentAI', 'endpoint')
+    client = DocumentIntelligenceClient(endpoint=endpoint, credential=AzureKeyCredential(api_key))
+    return client
 
-AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
-AZURE_DOCUMENT_INTELLIGENCE_KEY = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")
-# aggiungiamo un retry
-MAX_RETRIES = 3
-DELAY = 5  # Seconds
+def is_file_or_url(input_string):
+    if os.path.isfile(input_string):
+        return 'file'
+    elif urlparse(input_string).scheme in ['http', 'https']:
+        return 'url'
+    else:
+        return 'unknown'
 
+def load_file_as_base64(file_path):
+    with open(file_path, "rb") as f:
+        data = f.read()
+    base64_bytes = base64.b64encode(data)
+    base64_string = base64_bytes.decode('utf-8')
+    return base64_string
 
-def analyze_receipt(pdf_file):
-    """Analizza un file PDF di una ricevuta utilizzando Azure Document Intelligence."""
+def analyze_receipt(file_content):
+    """
+    Analizza un invoice utilizzando Azure Document Intelligence.
+    file_content: contenuto del file in formato base64.
+    Returns: A dictionary containing the extracted data, or None on error.
+    """
+    document_ai_client = client()
+    model_id = 'prebuilt-invoice'
 
-    credential = AzureKeyCredential(AZURE_DOCUMENT_INTELLIGENCE_KEY)
-    document_intelligence_client = DocumentIntelligenceClient(
-        endpoint=AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT, credential=credential
-    )
+    try:
+        poller = document_ai_client.begin_analyze_document(
+            model_id,
+            {"base64Source": file_content},
+            locale="it-IT",
+        )
+        result = poller.result()
 
-    for attempt in range(MAX_RETRIES):
-        try:
-            # Leggi il contenuto del file PDF
-            pdf_content = pdf_file.read()
+        if result.documents:
+            document = result.documents[0]
+            document_fields = document['fields']
+            fields = document_fields.keys()
 
-            # Analizza il documento con il modello predefinito di ricevute
-            poller = document_intelligence_client.begin_analyze_document(
-                "prebuilt-receipt", document=pdf_content
-            )
-            result = poller.result()
-
-            extracted_data = {
-                "Nome Venditore": None,
-                "Indirizzo Venditore": None,
-                "Numero di telefono Venditore": None,
-                "Data": None,
-                "PIVA": None,
-                "Totale": None,
+            data_dict = {
+                "Nome Venditore": "N/A",
+                "Indirizzo Venditore": "N/A",
+                "Numero di telefono Venditore": "N/A",
+                "Data": "N/A",  # Gestisce data e ora
+                "PIVA": "N/A",
+                "Totale": "N/A",
                 "Lista di prodotti": []
             }
 
-            # Estrai i campi di interesse
-            for field, field_value in result.documents[0].fields.items():
+            for field in fields:
+                if field == 'Lista di prodotti':
+                    items_list = []
+                    items = document_fields[field]
+
+                    for item in items['valueArray']:
+                        item_fields = item['valueObject']
+                        item_dict = {
+                            "Descrizione": "N/A",
+                            "Quantità": "N/A",
+                            "Costo unitario": "N/A",
+                            "Costo totale": "N/A",
+                            "Codice prodotto": "N/A"
+                        }
+                        for item_field in item_fields.keys():
+                            value = item_fields[item_field].get('content', 'N/A')
+                            item_dict[item_field] = value
+                        items_list.append(item_dict)
+
+                    data_dict['Lista di prodotti'] = items_list
+                    continue  # Skip direct printing here
+
+                value = document_fields[field].get('content', 'N/A')
                 if field == "MerchantName":
-                    extracted_data["Nome Venditore"] = field_value.value
+                    data_dict["Nome Venditore"] = value
                 elif field == "MerchantAddress":
-                    extracted_data["Indirizzo Venditore"] = field_value.value
+                    data_dict["Indirizzo Venditore"] = value
                 elif field == "MerchantPhoneNumber":
-                    extracted_data["Numero di telefono Venditore"] = field_value.value
+                    data_dict["Numero di telefono Venditore"] = value
                 elif field == "TransactionDate":
-                    extracted_data["Data"] = field_value.value
+                    data_dict["Data"] = value #prende data e ora se presente
                 elif field == "MerchantTaxId":
-                    extracted_data["PIVA"] = field_value.value
+                    data_dict["PIVA"] = value
                 elif field == "Total":
-                    extracted_data["Totale"] = field_value.value
+                    data_dict["Totale"] = value
 
-            # Estrai la lista dei prodotti (Items)
-            if "Items" in result.documents[0].fields:
-                for item in result.documents[0].fields["Items"].value:
-                    product = {
-                        "Descrizione": None,
-                        "Quantità": None,
-                        "Costo unitario": None,
-                        "Costo totale": None,
-                        "Codice prodotto": None  # Potrebbe non essere sempre presente
-                    }
 
-                    if "Name" in item.value:
-                        product["Descrizione"] = item.value["Name"].value
-                    if "Quantity" in item.value:
-                        product["Quantità"] = item.value["Quantity"].value
-                    if "Price" in item.value:
-                        product["Costo unitario"] = item.value["Price"].value
-                    if "TotalPrice" in item.value:
-                        product["Costo totale"] = item.value["TotalPrice"].value
+            return data_dict
 
-                    extracted_data["Lista di prodotti"].append(product)
+        else:
+            print("No documents found in the result.")  # Log to console, not Streamlit
+            return None
 
-            return extracted_data
-
-        except Exception as e:
-            logging.error(f"Attempt {attempt + 1} failed: {e}")
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(DELAY)  # Wait before retrying
-            else:
-                logging.error(f"Extraction completely failed after {MAX_RETRIES} attempts.")
-                return None
-
-def extract_text_from_pdf(pdf_file):
-    """Estrae il testo da un file PDF usando pypdf."""
-    try:
-        pdf_content = pdf_file.read()
-        pdf_reader = PdfReader(pdf_content)
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text()
-        return text
     except Exception as e:
-        logging.error(f"Error during text extraction: {e}")
+        print(f"Error during document analysis: {e}")  # Log to console, not Streamlit
         return None
+
