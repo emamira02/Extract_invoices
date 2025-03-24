@@ -82,24 +82,30 @@ else:
 #definiamo una funziona avente come parametro i nostri dati
     def edit_data(data):
 
-        data["VendorName"] = st.text_input("Nome Venditore", value=data.get("VendorName", "N/A"))
-        data["VendorAddress"] = st.text_input("Indirizzo Venditore", value=data.get("VendorAddress", "N/A"))
-        data["Numero di telefono Venditore"] = st.text_input("Numero di telefono Venditore", value=data.get("Numero di telefono Venditore", "N/A"))
-        data["InvoiceDate"] = st.text_input("Data", value=data.get("InvoiceDate", "N/A"))
-        data["VendorTaxId"] = st.text_input("PIVA", value=data.get("VendorTaxId", "N/A"))
-        data["InvoiceTotal"] = st.text_input("Totale", value=data.get("InvoiceTotal", "N/A"))
+#per mostrare solo i dati in italiano creiamo un dizionario al quale aggiungeremo tutti i parametri
+        data_it = {}
+
+        data_it["Nome Venditore"] = st.text_input("Nome Venditore", value=data.get("VendorName", "N/A"))
+        data_it["Indirizzo Venditore"] = st.text_input("Indirizzo Venditore", value=data.get("VendorAddress", "N/A"))
+        data_it["Numero di telefono Venditore"] = st.text_input("Numero di telefono Venditore", value=data.get("Numero di telefono Venditore", "N/A"))
+        data_it["Data"] = st.text_input("Data", value=data.get("InvoiceDate", "N/A"))
+        data_it["PIVA"] = st.text_input("PIVA", value=data.get("VendorTaxId", "N/A"))
+        data_it["Totale"] = st.text_input("Totale", value=data.get("InvoiceTotal", "N/A"))
       
 
-        # questa è la nostra lista di prodotti, che può essere modificata
+        # questa è la nostra lista di prodotti in un dataframe, che in caso non ci sia nulla restituisci un dataframe vuoto
+        # che può essere modificata
         st.subheader("Lista di Prodotti")
-        if "Items" in extracted_data:
-            df = pd.DataFrame(extracted_data["Items"])
+        if "Items" in data:
+            df = pd.DataFrame(data["Items"])
+        else:
+            df = pd.DataFrame()
 
         edited_df = st.data_editor(df, num_rows="dynamic") 
 
-        data["Lista di prodotti"] = edited_df.to_dict("records") 
+        data_it["Lista Prodotti"] = edited_df.to_dict("records")
 
-        return data
+        return data_it
 
     #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
     uploaded_file = st.file_uploader(
@@ -134,10 +140,7 @@ else:
                 st.header("Dati Estratti")
                 edited_data = edit_data(extracted_data)
 
-                #queste due righe di codice sono per visualizzare i nostri dati json
-                #in fase di debug, successivamente vanno tolte perchè non va mostrato il json
-                st.subheader("Dati Editati")
-                st.write(edited_data)
+               
 
             #creiamo un bottone per scaricare i nostri dati in formato json
                 st.download_button(
