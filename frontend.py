@@ -46,7 +46,7 @@ else:
         logging.info(f"User {st.experimental_user.name} ({st.experimental_user.email}) successfully logged in.")
 
     # il titolo della nostra app con qualche edit estetico
-    st.markdown("# Scanner a :red[PDF] with :blue-background[Azure AI]")
+    st.markdown("# Extract Invoice Data from a :red[PDF] with :blue-background[Azure AI]")
 
 #la funzione per gestire il file che viene caricato, se non è vuota allora il file
 #viene letto, andando a verificare però che il file sia un file pdf, ed in caso creando
@@ -102,13 +102,17 @@ else:
         return data
 
     #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
-    uploaded_file = st.file_uploader("Carica un file PDF", type=["pdf"])
+    uploaded_file = st.file_uploader(
+        label = "Upload a PDF Invoice File", 
+        type=["pdf"]
+        )
+    logging.info("Waiting for the file upload")
 
 #se il file è stato caricato con successo , gestiamo l'upload con la nostra funzione
 #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto restituendo
 #estracted_data come variabile, in caso contrario restituisce un errore durante l'aalisi del documento
     if uploaded_file is not None:
-        st.write("File caricato con successo!")
+        st.success(f"File {uploaded_file.name} caricato con successo")
 
         temporary_file_path = handle_file_upload(uploaded_file)
         if temporary_file_path:
