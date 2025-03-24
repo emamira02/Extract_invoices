@@ -29,12 +29,8 @@ def load_file_as_base64(file_path):
     base64_string = base64_bytes.decode('utf-8')
     return base64_string
 
-def analyze_receipt(file_content):
-    """
-    Analizza un invoice utilizzando Azure Document Intelligence.
-    file_content: contenuto del file in formato base64.
-    Returns: A dictionary containing the extracted data, or None on error.
-    """
+def analyze_invoice(file_content):
+
     document_ai_client = client()
     model_id = 'prebuilt-invoice'
 
@@ -51,51 +47,33 @@ def analyze_receipt(file_content):
             document_fields = document['fields']
             fields = document_fields.keys()
 
-            data_dict = {
-                "Nome Venditore": "N/A",
-                "Indirizzo Venditore": "N/A",
-                "Numero di telefono Venditore": "N/A",
-                "Data": "N/A",  # Gestisce data e ora
-                "PIVA": "N/A",
-                "Totale": "N/A",
-                "Lista di prodotti": []
-            }
+            data_dict = {}
+            other_fields = {}  # Store non-item fields
+            items_list = []
 
             for field in fields:
-                if field == 'Lista di prodotti':
-                    items_list = []
-                    items = document_fields[field]
-
-                    for item in items['valueArray']:
+                if field == 'Items':
+                    for item in document_fields[field]['valueArray']:
                         item_fields = item['valueObject']
-                        item_dict = {
-                            "Descrizione": "N/A",
-                            "Quantità": "N/A",
-                            "Costo unitario": "N/A",
-                            "Costo totale": "N/A",
-                            "Codice prodotto": "N/A"
-                        }
-                        for item_field in item_fields.keys():
-                            value = item_fields[item_field].get('content', 'N/A')
-                            item_dict[item_field] = value
+                        item_dict = {}
+
+                        # Extract fields with error handling
+                        item_dict['Description'] = item_fields.get('Description', {}).get('content', '')
+                        item_dict['Quantity'] = item_fields.get('Quantity', {}).get('content', '')
+                        item_dict['UnitPrice'] = item_fields.get('UnitPrice', {}).get('content', '')
+                        item_dict['Amount'] = item_fields.get('Amount', {}).get('content', '')
+
                         items_list.append(item_dict)
+                    continue
 
-                    data_dict['Lista di prodotti'] = items_list
-                    continue  # Skip direct printing here
+                # Store other fields
+                value = document_fields[field].get('content', '')
+                other_fields[field] = value
 
-                value = document_fields[field].get('content', 'N/A')
-                if field == "MerchantName":
-                    data_dict["Nome Venditore"] = value
-                elif field == "MerchantAddress":
-                    data_dict["Indirizzo Venditore"] = value
-                elif field == "MerchantPhoneNumber":
-                    data_dict["Numero di telefono Venditore"] = value
-                elif field == "TransactionDate":
-                    data_dict["Data"] = value #prende data e ora se presente
-                elif field == "MerchantTaxId":
-                    data_dict["PIVA"] = value
-                elif field == "Total":
-                    data_dict["Totale"] = value
+
+            # Merge dictionaries, putting other fields first, and Items last
+            data_dict.update(other_fields)
+            data_dict['Items'] = items_list
 
 
             return data_dict
@@ -107,4 +85,3 @@ def analyze_receipt(file_content):
     except Exception as e:
         print(f"Error during document analysis: {e}")  # Log to console, not Streamlit
         return None
-
