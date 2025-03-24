@@ -3,7 +3,7 @@ import json
 import logging
 import pandas as pd
 import os
-from backend import analyze_receipt
+from backend import analyze_invoice
 
 # configuriamo la nostra pagina per visualizzare tutto centralmente, ed impostando il titolo
 st.set_page_config(
@@ -82,12 +82,13 @@ else:
 #definiamo una funziona avente come parametro i nostri dati
     def edit_data(data):
 
-        data["Nome Venditore"] = st.text_input("Nome Venditore", value=data.get("Nome Venditore", "N/A"))
-        data["Indirizzo Venditore"] = st.text_input("Indirizzo Venditore", value=data.get("Indirizzo Venditore", "N/A"))
+        data["VendorName"] = st.text_input("Nome Venditore", value=data.get("VendorName", "N/A"))
+        data["VendorAddress"] = st.text_input("Indirizzo Venditore", value=data.get("VendorAddress", "N/A"))
         data["Numero di telefono Venditore"] = st.text_input("Numero di telefono Venditore", value=data.get("Numero di telefono Venditore", "N/A"))
-        data["Data"] = st.text_input("Data", value=data.get("Data", "N/A"))
-        data["PIVA"] = st.text_input("PIVA", value=data.get("PIVA", "N/A"))
-        data["Totale"] = st.text_input("Totale", value=data.get("Totale", "N/A"))
+        data["InvoiceDate"] = st.text_input("Data", value=data.get("InvoiceDate", "N/A"))
+        data["VendorTaxId"] = st.text_input("PIVA", value=data.get("VendorTaxId", "N/A"))
+        data["InvoiceTotal"] = st.text_input("Totale", value=data.get("InvoiceTotal", "N/A"))
+      
 
         # questa è la nostra lista di prodotti, che può essere modificata
         st.subheader("Lista di Prodotti")
@@ -125,7 +126,7 @@ else:
                 try:
                     with open(temporary_file_path, "rb") as f: 
                         file_content = f.read()
-                        extracted_data = analyze_receipt(file_content)
+                        extracted_data = analyze_invoice(file_content)
                 except Exception as e:
                     logging.error(f"Error during document analysis: {e}")
                     st.error(f"Error during document analysis: {e}")
