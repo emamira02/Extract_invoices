@@ -73,7 +73,13 @@ def analyze_invoice(file_content):
                         if item_dict['Quantità'] == "1": 
                             item_dict['PrezzoUnità'] = item_dict['Totale']
                         else:
-                            item_dict['PrezzoUnità'] = item_dict['Totale']/item_dict['PrezzoUnità']
+                            try:
+                                totale = item_dict['Totale'].strip()
+                                prezzo_unitario = item_dict['PrezzoUnità'].strip()
+                                item_dict['PrezzoUnità'] = float(totale) / float(prezzo_unitario)
+                            except (ValueError, TypeError):
+                                None
+
                               
                             
                         items_list.append(item_dict)
