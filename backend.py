@@ -54,12 +54,13 @@ def analyze_invoice(file_content):
             for field in fields:
                 if field == 'Items':
                     for item in document_fields[field]['valueArray']:
-                        item_fields = item['valueObject']
+                        item_fields = item.get('valueObject', {})
                         item_dict = {}
 
                         #essendo il modello addestrato in inglese, andiamo a prendere il valore della Description
                         #ed aggiungerlo a Descrizione,e così per ogni parametro
                         item_dict['Descrizione'] = item_fields.get('Description', {}).get('content', '')
+                        item_dict['Codice Prodotto'] = item_fields.get('ProductCode:', {}).get('content', '')
                         item_dict['Quantità'] = item_fields.get('Quantity', {}).get('content', '')
                         item_dict['PrezzoUnità'] = item_fields.get('UnitPrice', {}).get('content', '')
                         item_dict['Totale'] = item_fields.get('Amount', {}).get('content', '')

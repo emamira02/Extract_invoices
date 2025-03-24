@@ -87,7 +87,7 @@ else:
 
         data_it["Nome Venditore"] = st.text_input("Nome Venditore", value=data.get("VendorName", "N/A"))
         data_it["Indirizzo Venditore"] = st.text_input("Indirizzo Venditore", value=data.get("VendorAddress", "N/A"))
-        data_it["Numero di telefono Venditore"] = st.text_input("Numero di telefono Venditore", value=data.get("Numero di telefono Venditore", "N/A"))
+        data_it["Numero di telefono Venditore"] = st.text_input("Numero di telefono Venditore", value=data.get("VendorPhoneNumber", "N/A"))
         data_it["Data"] = st.text_input("Data", value=data.get("InvoiceDate", "N/A"))
         data_it["PIVA"] = st.text_input("PIVA", value=data.get("VendorTaxId", "N/A"))
         data_it["Totale"] = st.text_input("Totale", value=data.get("InvoiceTotal", "N/A"))
