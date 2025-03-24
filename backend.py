@@ -1,11 +1,9 @@
-import os
 import configparser
 import base64
-from urllib.parse import urlparse
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.documentintelligence import DocumentIntelligenceClient
-from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 
+#configuriamo tutti i parametri per chiamare correttamente la nostra Azure AI, creando un file client.ini
 def client():
     config = configparser.ConfigParser()
     config.read('client.ini')
@@ -14,14 +12,8 @@ def client():
     client = DocumentIntelligenceClient(endpoint=endpoint, credential=AzureKeyCredential(api_key))
     return client
 
-def is_file_or_url(input_string):
-    if os.path.isfile(input_string):
-        return 'file'
-    elif urlparse(input_string).scheme in ['http', 'https']:
-        return 'url'
-    else:
-        return 'unknown'
-
+#qua definiamo una funzione che prende il percorso di un file come input e restituisce il contenuto del file
+#codificato come una stringa base64.
 def load_file_as_base64(file_path):
     with open(file_path, "rb") as f:
         data = f.read()
@@ -29,11 +21,17 @@ def load_file_as_base64(file_path):
     base64_string = base64_bytes.decode('utf-8')
     return base64_string
 
+#qua andiamo a definire la nostra funzione per analizzare il nostro invoice, con 
+#parametro il contenuto del file, usando come modello uno preimpostato 'prebuilt-invoice',
+
 def analyze_invoice(file_content):
 
     document_ai_client = client()
     model_id = 'prebuilt-invoice'
 
+#impostiamo un try-except per gestire gli errori in caso di analisi non riuscita
+#inziamo ad analizzare il nostro documento analizzando la stringa di testo creato prima
+#con base64 e se i risultati sono presenti aggiungiamo i vari valori al dizionario creato
     try:
         poller = document_ai_client.begin_analyze_document(
             model_id,
@@ -48,30 +46,46 @@ def analyze_invoice(file_content):
             fields = document_fields.keys()
 
             data_dict = {}
-            other_fields = {}  # Store non-item fields
+            other_fields = {}  
             items_list = []
 
+#definendo i vari parametri per andare ad estrarre correttamente tutti i vari parametri 
+#che ci servono
             for field in fields:
                 if field == 'Items':
                     for item in document_fields[field]['valueArray']:
                         item_fields = item['valueObject']
                         item_dict = {}
 
-                        # Extract fields with error handling
-                        item_dict['Description'] = item_fields.get('Description', {}).get('content', '')
-                        item_dict['Quantity'] = item_fields.get('Quantity', {}).get('content', '')
-                        item_dict['UnitPrice'] = item_fields.get('UnitPrice', {}).get('content', '')
-                        item_dict['Amount'] = item_fields.get('Amount', {}).get('content', '')
-
+                        #essendo il modello addestrato in inglese, andiamo a prendere il valore della Description
+                        #ed aggiungerlo a Descrizione,e così per ogni parametro
+                        item_dict['Descrizione'] = item_fields.get('Description', {}).get('content', '')
+                        item_dict['Quantità'] = item_fields.get('Quantity', {}).get('content', '')
+                        item_dict['PrezzoUnità'] = item_fields.get('UnitPrice', {}).get('content', '')
+                        item_dict['Totale'] = item_fields.get('Amount', {}).get('content', '')
+                        
+                        #poniamo la condizione per la quale se la quantità è vuota o None
+                        #allora assegniamo direttamente il valore 1, se la quantità è 1 allora il prezzo
+                        #di ciascuna unità corrisponde al totale, in caso contrario fa una divisione
+                        #tra totale e prezzo unità
+                        if not item_dict['Quantità']: 
+                            item_dict['Quantità'] = "1" 
+                        if item_dict['Quantità'] == "1": 
+                            item_dict['PrezzoUnità'] = item_dict['Totale']
+                        else:
+                            item_dict['PrezzoUnità'] = item_dict['Totale']/item_dict['PrezzoUnità']
+                              
+                            
                         items_list.append(item_dict)
                     continue
 
-                # Store other fields
+            #in caso ci siano altri valori da aggiungere li aggiungiamo al dizionario creato
                 value = document_fields[field].get('content', '')
                 other_fields[field] = value
 
 
-            # Merge dictionaries, putting other fields first, and Items last
+            #aggiorniamo il nostro dizionario principale facendo un "merge" tra i due
+            #e lo restituiamo
             data_dict.update(other_fields)
             data_dict['Items'] = items_list
 
@@ -79,9 +93,9 @@ def analyze_invoice(file_content):
             return data_dict
 
         else:
-            print("No documents found in the result.")  # Log to console, not Streamlit
+            print("No documents found in the result.") 
             return None
 
     except Exception as e:
-        print(f"Error during document analysis: {e}")  # Log to console, not Streamlit
+        print(f"Error during document analysis: {e}") 
         return None
