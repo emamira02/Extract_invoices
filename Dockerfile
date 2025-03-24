@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copia solo i file necessari
-COPY frontend.py translate.py backend.py ./
+COPY frontend.py backend.py ./
 
 
 # Imposta la porta su cui Streamlit verrà eseguito (la porta 8501 è quella predefinita)
