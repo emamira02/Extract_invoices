@@ -1,6 +1,5 @@
 streamlit
 azure-ai-documentintelligence
-python-dotenv
-requests
+azure-core
+configparser
 pandas
-pypdf
