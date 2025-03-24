@@ -3,7 +3,6 @@ services:
     build: .
     ports:
       - "8501:8501"
-    env_file:
-      - .env
     volumes:
+      - ./client.ini:/app/client.ini 
       - ./.streamlit/secrets.toml:/app/.streamlit/secrets.toml

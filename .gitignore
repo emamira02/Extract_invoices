@@ -1,7 +1,5 @@
 venv/
-.env
 __pycache__/
 .streamlit/secrets.toml
 app.log
-invoice
 client.ini
