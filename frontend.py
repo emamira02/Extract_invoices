@@ -92,18 +92,8 @@ else:
 
         # questa è la nostra lista di prodotti, che può essere modificata
         st.subheader("Lista di Prodotti")
-        df = pd.DataFrame(data.get("Lista di prodotti", [])) 
-
-    #se il dataframe è vuoto ci assicuriamo che esso venga mostrato comunque e che
-    #i data siano modificabili
-        if df.empty:
-            df = pd.DataFrame({
-                "Descrizione": ["N/A"],
-                "Quantità": ["N/A"],
-                "Costo unitario": ["N/A"],
-                "Costo totale": ["N/A"],
-                "Codice prodotto": ["N/A"]
-            })
+        if "Items" in extracted_data:
+            df = pd.DataFrame(extracted_data["Items"])
 
         edited_df = st.data_editor(df, num_rows="dynamic") 
 
