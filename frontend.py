@@ -115,7 +115,7 @@ else:
     logging.info("Waiting for the file upload")
 
     # Initialize session state
-    if 'extracted_data' not in st.session_state:
+    if 'extracted_data' in st.session_state:
         st.session_state['extracted_data'] = None
     if 'edited_data' not in st.session_state:
          st.session_state['edited_data'] = None
