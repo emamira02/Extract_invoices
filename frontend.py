@@ -3,6 +3,8 @@ import json
 import logging
 import pandas as pd
 import os
+import io
+from PIL import Image
 from backend import analyze_invoice
 
 # configuriamo la nostra pagina per visualizzare tutto centralmente, ed impostando il titolo
@@ -46,7 +48,7 @@ else:
         logging.info(f"User {st.experimental_user.name} ({st.experimental_user.email}) successfully logged in.")
 
     # il titolo della nostra app con qualche edit estetico
-    st.markdown("# Extract Invoice Data from a :red[PDF] with :blue-background[Azure AI]")
+    st.markdown("# Extract :blue[Invoice Data] with :blue-background[Azure AI]")
 
 #la funzione per gestire il file che viene caricato, se non è vuota allora il file
 #viene letto, andando a verificare però che il file sia un file pdf, ed in caso creando
@@ -56,11 +58,26 @@ else:
             file_content = uploaded_file.read()
             file_type = uploaded_file.type
             file_extension = uploaded_file.name.split(".")[-1].lower()
-            temporary_file_path = "temp.pdf"
+            temporary_file_path = f"temp.{file_extension}"
 
+#definiamo la funzione per i PDF, di solito i primi bytes contengono %PDF quindi ci basta questo
+#per assicurarci lo sia, invece per le img, potendo avere schemi differenti, non sempre è così, quindi
+#usiamo la lib Pillow e il modulo io per aprire e verificare il contenuto
             def file_PDF(file_content):
-                return file_content.startswith(b'%PDF',)
+                return file_content.startswith(b'%PDF')
 
+            def file_IMG(file_content):
+                try:
+
+                    img = Image.open(io.BytesIO(file_content))
+                    img.verify() 
+                    return True
+                except Exception as e:
+                    logging.warning(f"Invalid image file: {e}")
+                    return False
+
+#qua poniamo dei semplici blocchi if ed elif, affinchè se nelle nostre funzioni è presente il file_content
+#allora creiamo un file temporaneo in writing-binary mode con il file_content in esso, altrimenti restituisce errore
             if file_type == "application/pdf" or file_extension == "pdf":
                 if file_PDF(file_content):
                     with open(temporary_file_path, "wb") as temporary_file:
@@ -70,6 +87,17 @@ else:
                     logging.warning(f"Invalid PDF file uploaded: {uploaded_file.name}")
                     st.error(f"Invalid PDF file uploaded: {uploaded_file.name}")
                     return None
+
+            elif file_extension in ("jpg", "jpeg", "png"):
+                if file_IMG(file_content):
+                    with open(temporary_file_path, "wb") as temporary_file:
+                        temporary_file.write(file_content)
+                    return temporary_file_path
+                else:
+                    logging.warning(f"Invalid {file_extension.upper()} file uploaded: {uploaded_file.name}")
+                    st.error(f"Invalid {file_extension.upper()} file uploaded: {uploaded_file.name}")
+                    return None
+
             else:
                 logging.warning(f"Unsupported file type uploaded: {file_type} - {uploaded_file.name}")
                 st.error(f"Unsupported file type uploaded: {uploaded_file.name}")
@@ -110,7 +138,7 @@ else:
     #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
     uploaded_file = st.file_uploader(
         label = "Upload a PDF Invoice File", 
-        type=["pdf"],
+        type=["pdf", "jpg","png", "jpeg"],
         key="file_uploader"
         )
     logging.info("Waiting for the file upload")
