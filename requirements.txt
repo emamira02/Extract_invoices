@@ -3,4 +3,5 @@ azure-ai-documentintelligence
 azure-core
 configparser
 pandas
+pillow
 authlib
