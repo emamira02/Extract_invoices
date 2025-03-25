@@ -110,26 +110,35 @@ else:
     #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
     uploaded_file = st.file_uploader(
         label = "Upload a PDF Invoice File", 
-        type=["pdf"]
+        type=["pdf"],
+        key="file_uploader"
         )
     logging.info("Waiting for the file upload")
 
-    # Initialize session state
-    if 'extracted_data' in st.session_state:
+    #inizializziamo le variabili di sessione che andremo ad utilizzare
+    if 'extracted_data' not in st.session_state:
         st.session_state['extracted_data'] = None
     if 'edited_data' not in st.session_state:
          st.session_state['edited_data'] = None
-
+    if 'uploaded_file_name' not in st.session_state:
+        st.session_state['uploaded_file_name'] = None
 
 #se il file è stato caricato con successo , gestiamo l'upload con la nostra funzione
 #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto restituendo
 #estracted_data come variabile, in caso contrario restituisce un errore durante l'aalisi del documento
     if uploaded_file is not None:
+        #inseriamo la variabile di sessione per l'uploaded_file in modo tale da
+        #riavviare l'analisi in caso di cambio file caricato, resettando i dati estratti
+        if uploaded_file.name != st.session_state['uploaded_file_name']:
+            st.session_state['extracted_data'] = None  
+            st.session_state['edited_data'] = None
+            st.session_state['uploaded_file_name'] = uploaded_file.name
+
         st.success(f"File {uploaded_file.name} caricato con successo")
 
         temporary_file_path = handle_file_upload(uploaded_file)
         if temporary_file_path:
-            if st.session_state['extracted_data'] is None:  # Analyze only once
+            if st.session_state['extracted_data'] is None:
                 with st.spinner("Analizzando il documento..."):
                     try:
                         with open(temporary_file_path, "rb") as f: 
