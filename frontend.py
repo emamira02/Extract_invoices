@@ -85,12 +85,12 @@ else:
 #per mostrare solo i dati in italiano creiamo un dizionario al quale aggiungeremo tutti i parametri
         data_it = {}
 
-        data_it["Nome Venditore"] = st.text_input("Nome Venditore", value=data.get("VendorName", "N/A"))
-        data_it["Indirizzo Venditore"] = st.text_input("Indirizzo Venditore", value=data.get("VendorAddress", "N/A"))
-        data_it["Numero di telefono Venditore"] = st.text_input("Numero di telefono Venditore", value=data.get("VendorPhoneNumber", "N/A"))
-        data_it["Data"] = st.text_input("Data", value=data.get("InvoiceDate", "N/A"))
-        data_it["PIVA"] = st.text_input("PIVA", value=data.get("VendorTaxId", "N/A"))
-        data_it["Totale"] = st.text_input("Totale", value=data.get("InvoiceTotal", "N/A"))
+        data_it["Nome Venditore"] = st.text_input("Nome Venditore", value=data.get("VendorName", "N/A"), key="vendor_name")
+        data_it["Indirizzo Venditore"] = st.text_input("Indirizzo Venditore", value=data.get("VendorAddress", "N/A"), key="vendor_address")
+        data_it["Numero di telefono Venditore"] = st.text_input("Numero di telefono Venditore", value=data.get("VendorPhoneNumber", "N/A"), key="vendor_phone")
+        data_it["Data"] = st.text_input("Data", value=data.get("InvoiceDate", "N/A"), key="invoice_date")
+        data_it["PIVA"] = st.text_input("PIVA", value=data.get("VendorTaxId", "N/A"), key="vendor_tax_id")
+        data_it["Totale"] = st.text_input("Totale", value=data.get("InvoiceTotal", "N/A"), key="invoice_total")
       
 
         # questa è la nostra lista di prodotti in un dataframe, che in caso non ci sia nulla restituisci un dataframe vuoto
@@ -101,7 +101,7 @@ else:
         else:
             df = pd.DataFrame()
 
-        edited_df = st.data_editor(df, num_rows="dynamic") 
+        edited_df = st.data_editor(df, num_rows="dynamic", key="items_df") 
 
         data_it["Lista Prodotti"] = edited_df.to_dict("records")
 
@@ -114,6 +114,13 @@ else:
         )
     logging.info("Waiting for the file upload")
 
+    # Initialize session state
+    if 'extracted_data' not in st.session_state:
+        st.session_state['extracted_data'] = None
+    if 'edited_data' not in st.session_state:
+         st.session_state['edited_data'] = None
+
+
 #se il file è stato caricato con successo , gestiamo l'upload con la nostra funzione
 #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto restituendo
 #estracted_data come variabile, in caso contrario restituisce un errore durante l'aalisi del documento
@@ -122,30 +129,31 @@ else:
 
         temporary_file_path = handle_file_upload(uploaded_file)
         if temporary_file_path:
-            with st.spinner("Analizzando il documento..."):
-                try:
-                    with open(temporary_file_path, "rb") as f: 
-                        file_content = f.read()
-                        extracted_data = analyze_invoice(file_content)
-                except Exception as e:
-                    logging.error(f"Error during document analysis: {e}")
-                    st.error(f"Error during document analysis: {e}")
-                    extracted_data = None
+            if st.session_state['extracted_data'] is None:  # Analyze only once
+                with st.spinner("Analizzando il documento..."):
+                    try:
+                        with open(temporary_file_path, "rb") as f: 
+                            file_content = f.read()
+                            st.session_state['extracted_data'] = analyze_invoice(file_content)
+                    except Exception as e:
+                        logging.error(f"Error during document analysis: {e}")
+                        st.error(f"Error during document analysis: {e}")
+                        st.session_state['extracted_data'] = None
 
-                os.remove(temporary_file_path)  
+                    os.remove(temporary_file_path)  
 
             #se i dati estratti sono presenti usiamo la funzione per poter permettere la 
             #modifica di essi, in caso contrario restituisce un errore di estrazione dati
-            if extracted_data:
+            if st.session_state['extracted_data']:
                 st.header("Dati Estratti")
-                edited_data = edit_data(extracted_data)
+                st.session_state['edited_data'] = edit_data(st.session_state['extracted_data'])
 
                
 
             #creiamo un bottone per scaricare i nostri dati in formato json
                 st.download_button(
                     label="Scarica i dati in formato JSON",
-                    data=json.dumps(edited_data, indent=4, ensure_ascii=False).encode('utf-8'),
+                    data=json.dumps(st.session_state['edited_data'], indent=4, ensure_ascii=False).encode('utf-8'),
                     file_name="extracted_data.json",
                     mime="application/json",
                 )
