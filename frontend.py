@@ -149,8 +149,6 @@ else:
                         st.error(f"Error during document analysis: {e}")
                         st.session_state['extracted_data'] = None
 
-                    os.remove(temporary_file_path)  
-
             #se i dati estratti sono presenti usiamo la funzione per poter permettere la 
             #modifica di essi, in caso contrario restituisce un errore di estrazione dati
             if st.session_state['extracted_data']:
@@ -165,6 +163,8 @@ else:
                     data=json.dumps(st.session_state['edited_data'], indent=4, ensure_ascii=False).encode('utf-8'),
                     file_name="extracted_data.json",
                     mime="application/json",
+                    on_click= "ignore"
                 )
+                os.remove(temporary_file_path)  
             else:
                 st.error("Impossibile estrarre i dati dal documento.")
