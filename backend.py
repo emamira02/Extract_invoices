@@ -97,14 +97,17 @@ def analyze_invoice(file_content):
             data_dict.update(other_fields)
             data_dict['Items'] = items_list
 
-            # aggiungiamo un blocco try affinchè, ci estragga il numero di telefono dal receipt model
-            #poichè non presente nel prebuilt-invoice model e lo aggiungiamo al dict
+            # aggiungiamo un blocco try affinchè, ci estragga il numero di telefono e orario dal receipt model
+            #poichè non presente nel prebuilt-invoice model e li aggiungiamo al dict
             try:
-                phone_number = analyze_receipt(file_content)
-                if phone_number:
-                    data_dict["MerchantPhoneNumber"] = phone_number 
+                receipt_data = analyze_receipt(file_content)
+                if receipt_data:
+                    phone_number, tran_time = receipt_data
+                    data_dict["MerchantPhoneNumber"] = phone_number
+                    data_dict["TransactionTime"] = tran_time
             except Exception as e:
-                logging.warning(f"Failed to extract phone number from receipt: {e}")
+                logging.warning(f"Failed to extract phone number or transaction time from receipt: {e}")
+
 
             return data_dict
 
@@ -132,13 +135,18 @@ def analyze_receipt(file_content):
 
         if result.documents:
             document = result.documents[0]
-            if 'MerchantPhoneNumber' in document['fields']:
+            #poniamo una condizione per il quale, se questi campi si trovano nel documento, li estraiamo 
+            #e li restituiamo per mostrarli, in caso contrario non restituisce nulla
+            if 'MerchantPhoneNumber' in document['fields'] and 'TransactionTime' in document['fields']:
                 phone_number = document['fields']['MerchantPhoneNumber'].get('content', None)
-                return phone_number
+                tran_time = document['fields']['TransactionTime'].get('content', None)
+                return phone_number, tran_time
             else:
-                logging.info("MerchantPhoneNumber field not found in receipt.")
-                return None
-
+                logging.info("MerchantPhoneNumber or TransactionTime field not found in receipt.")
+                return None  
+        else:
+            logging.info("No documents found in receipt analysis.")
+            return None
 
     except Exception as e:
         logging.error(f"Error during receipt analysis: {e}")
