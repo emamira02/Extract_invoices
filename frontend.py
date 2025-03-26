@@ -115,7 +115,7 @@ else:
 
         data_it["Nome Venditore"] = st.text_input("Nome Venditore", value=data.get("VendorName", "N/A"), key="vendor_name")
         data_it["Indirizzo Venditore"] = st.text_input("Indirizzo Venditore", value=data.get("VendorAddress", "N/A"), key="vendor_address")
-        data_it["Numero di telefono Venditore"] = st.text_input("Numero di telefono Venditore", value=data.get("VendorPhoneNumber", "N/A"), key="vendor_phone")
+        data_it["Numero di telefono Venditore"] = st.text_input("Numero di telefono Venditore", value=data.get("MerchantPhoneNumber", "N/A"), key="vendor_phone")
         data_it["Data"] = st.text_input("Data", value=data.get("InvoiceDate", "N/A"), key="invoice_date")
         data_it["PIVA"] = st.text_input("PIVA", value=data.get("VendorTaxId", "N/A"), key="vendor_tax_id")
         data_it["Totale"] = st.text_input("Totale", value=data.get("InvoiceTotal", "N/A"), key="invoice_total")
