@@ -2,6 +2,7 @@ import configparser
 import base64
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.documentintelligence import DocumentIntelligenceClient
+import logging
 
 #configuriamo tutti i parametri per chiamare correttamente la nostra Azure AI, creando un file client.ini
 def client():
@@ -26,14 +27,15 @@ def load_file_as_base64(file_path):
 
 def analyze_invoice(file_content):
 
-    document_ai_client = client()
+    invoice_ai_client = client()
     model_id = 'prebuilt-invoice'
+    data_dict = {}
 
 #impostiamo un try-except per gestire gli errori in caso di analisi non riuscita
 #inziamo ad analizzare il nostro documento analizzando la stringa di testo creato prima
 #con base64 e se i risultati sono presenti aggiungiamo i vari valori al dizionario creato
     try:
-        poller = document_ai_client.begin_analyze_document(
+        poller = invoice_ai_client.begin_analyze_document(
             model_id,
             {"base64Source": file_content},
             locale="it-IT",
@@ -45,7 +47,6 @@ def analyze_invoice(file_content):
             document_fields = document['fields']
             fields = document_fields.keys()
 
-            data_dict = {}
             other_fields = {}  
             items_list = []
 
@@ -96,6 +97,14 @@ def analyze_invoice(file_content):
             data_dict.update(other_fields)
             data_dict['Items'] = items_list
 
+            # aggiungiamo un blocco try affinchè, ci estragga il numero di telefono dal receipt model
+            #poichè non presente nel prebuilt-invoice model e lo aggiungiamo al dict
+            try:
+                phone_number = analyze_receipt(file_content)
+                if phone_number:
+                    data_dict["MerchantPhoneNumber"] = phone_number 
+            except Exception as e:
+                logging.warning(f"Failed to extract phone number from receipt: {e}")
 
             return data_dict
 
@@ -105,4 +114,32 @@ def analyze_invoice(file_content):
 
     except Exception as e:
         print(f"Error during document analysis: {e}") 
+        return None
+
+def analyze_receipt(file_content):
+
+    receipt_ai_client = client()
+    model_id2 = 'prebuilt-receipt'
+
+
+    try:
+        poller = receipt_ai_client.begin_analyze_document(
+            model_id2,
+            {"base64Source": file_content},
+            locale="it-IT",
+        )
+        result = poller.result()
+
+        if result.documents:
+            document = result.documents[0]
+            if 'MerchantPhoneNumber' in document['fields']:
+                phone_number = document['fields']['MerchantPhoneNumber'].get('content', None)
+                return phone_number
+            else:
+                logging.info("MerchantPhoneNumber field not found in receipt.")
+                return None
+
+
+    except Exception as e:
+        logging.error(f"Error during receipt analysis: {e}")
         return None
