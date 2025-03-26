@@ -190,7 +190,7 @@ else:
                 st.download_button(
                     label="Scarica i dati in formato JSON",
                     data=json.dumps(st.session_state['edited_data'], indent=4, ensure_ascii=False).encode('utf-8'),
-                    file_name="extracted_data.json",
+                    file_name=f"{uploaded_file.name}.json",
                     mime="application/json",
                     on_click= "ignore"
                 )
