@@ -184,22 +184,16 @@ else:
                 st.header("Dati Estratti")
                 st.session_state['edited_data'] = edit_data(st.session_state['extracted_data'])
 
-                if "edited_data" in st.session_state:
-                    st.session_state["edited_data"]["Nome Venditore"] = st.session_state["vendor_name"]
-                    st.session_state["edited_data"]["Indirizzo Venditore"] = st.session_state["vendor_address"]
-                    st.session_state["edited_data"]["Numero di telefono Venditore"] = st.session_state["vendor_phone"]
-                    st.session_state["edited_data"]["Data"] = st.session_state["invoice_date"]
-                    st.session_state["edited_data"]["Orario"] = st.session_state["transaction_time"]
-                    st.session_state["edited_data"]["PIVA"] = st.session_state["vendor_tax_id"]
-                    st.session_state["edited_data"]["Totale"] = st.session_state["invoice_total"]
+               
 
-                #creiamo un bottone per scaricare i nostri dati in formato json
-                    st.download_button(
-                        label="Scarica i dati in formato JSON",
-                        data=json.dumps(st.session_state['edited_data'], indent=4, ensure_ascii=False).encode('utf-8'),
-                        file_name=f"{uploaded_file.name}.json",
-                        mime="application/json",
-                    )
-                    os.remove(temporary_file_path)  
+            #creiamo un bottone per scaricare i nostri dati in formato json
+                st.download_button(
+                    label="Scarica i dati in formato JSON",
+                    data=json.dumps(st.session_state['edited_data'], indent=4, ensure_ascii=False).encode('utf-8'),
+                    file_name=f"{uploaded_file.name}.json",
+                    mime="application/json",
+                    on_click= "ignore"
+                )
+                os.remove(temporary_file_path)  
             else:
                 st.error("Impossibile estrarre i dati dal documento.")
