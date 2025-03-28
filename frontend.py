@@ -8,7 +8,7 @@ from io import BytesIO
 import base64
 from PIL import Image
 import streamlit.components.v1 as components
-from backend import analyze_invoice
+from backend import analyze_invoice, download_button
 
 # configuriamo la nostra pagina per visualizzare tutto centralmente, ed impostando il titolo
 st.set_page_config(
@@ -53,38 +53,6 @@ else:
     # il titolo della nostra app con qualche edit estetico
     st.markdown("# Extract :blue[Data] with :blue-background[Azure AI]")
 
-    def download_button(object_to_download, download_filename):
-        #con un try-except andiamo a gestire il download del file, se è un dataframe
-        #lo convertiamo in csv, altrimenti se è un byte lo codifichiamo in base64 e lo convertiamo in stringa
-        try:
-            if isinstance(object_to_download, pd.DataFrame):
-                object_to_download = object_to_download.to_csv(index=False)
-            elif isinstance(object_to_download, bytes):
-                #qui andiamo a codificare l'oggetto in base64 e lo convertiamo in stringa per il download, che verrà
-                #eseguito tramite un link html che verrà cliccato automaticamente per scaricare il file, altrimenti
-                #restituisce un errore di download del file con un messaggio di errore e un log di errore 
-                b64 = base64.b64encode(object_to_download).decode()
-            else:
-                object_to_download = json.dumps(object_to_download, indent=4, ensure_ascii=False)
-                b64 = base64.b64encode(object_to_download.encode()).decode()
-
-            dl_link = f"""
-            <html>
-            <head>
-            <title>Start Auto Download file</title>
-            <script src="http://code.jquery.com/jquery-3.2.1.min.js"></script>
-            <script>
-            $('<a href="data:application/json;base64,{b64}" download="{download_filename}">')[0].click()
-            </script>
-            </head>
-            </html>
-            """
-            logging.info(f"Download link created for {download_filename}")
-            return dl_link
-        except Exception as e:
-            logging.error(f"Errore nella creazione del link di download: {e}")
-            st.error(f"Errore nella creazione del link di download: {e}")
-            return None
 
 #la funzione per gestire il file che viene caricato, se non è vuota allora il file
 #viene letto, andando a verificare però che il file sia un file pdf, ed in caso creando
@@ -205,6 +173,9 @@ else:
             except Exception as e:
                 logging.error(f"Error during the data update and download: {e}")
                 st.error(f"Errore durante l'aggiornamento dei dati e il download: {e}")
+            finally:
+                os.remove(temporary_file_path)
+                logging.info(f"Temporary file {temporary_file_path} deleted.")
 
         return data_it
 
@@ -250,6 +221,9 @@ else:
                         st.error(f"Error during document analysis: {e}")
                         st.session_state['extracted_data'] = None
                         logging.error("Document analysis failed.")
+                    finally:
+                        os.remove(temporary_file_path)
+                        logging.info(f"Temporary file {temporary_file_path} deleted.")
 
             #se i dati estratti sono presenti usiamo la funzione per poter permettere la 
             #modifica di essi, in caso contrario restituisce un errore di estrazione dati
