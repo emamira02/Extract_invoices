@@ -87,31 +87,31 @@ else:
                     with open(temporary_file_path, "wb") as temporary_file:
                         temporary_file.write(file_content)
                     logging.info(f"PDF file {uploaded_file.name} saved to temporary path.")
-                    return temporary_file_path
+                    return temporary_file_path, file_content
                 else:
                     logging.warning(f"Invalid PDF file uploaded: {uploaded_file.name}")
                     st.error(f"Invalid PDF file uploaded: {uploaded_file.name}")
-                    return None
+                    return None, None
 
             elif file_extension in ("jpg", "jpeg", "png"):
                 if file_IMG(file_content):
                     with open(temporary_file_path, "wb") as temporary_file:
                         temporary_file.write(file_content)
                     logging.info(f"Image file {uploaded_file.name} saved to temporary path.")
-                    return temporary_file_path
+                    return temporary_file_path, file_content
                 else:
                     logging.warning(f"Invalid {file_extension.upper()} file uploaded: {uploaded_file.name}")
                     st.error(f"Invalid {file_extension.upper()} file uploaded: {uploaded_file.name}")
-                    return None
+                    return None, None
 
             else:
                 logging.warning(f"Unsupported file type uploaded: {file_type} - {uploaded_file.name}")
                 st.error(f"Unsupported file type uploaded: {uploaded_file.name}")
-                return None
+                return None, None
         else:
             logging.warning("There's no file uploaded, please follow the right instructions")
             st.warning("There's no file uploaded, please follow the right instructions")
-            return None
+            return None, None
 
 #definiamo una funziona avente come parametro i nostri dati
     def edit_data(data):
@@ -206,8 +206,19 @@ else:
         st.success(f"File {uploaded_file.name} caricato con successo")
         logging.info(f"File {uploaded_file.name} uploaded successfully.")
 
-        temporary_file_path = handle_file_upload(uploaded_file)
+        temporary_file_path, file_content = handle_file_upload(uploaded_file)
+
         if temporary_file_path:
+
+            #mostriamo l'immagine o il pdf caricato, in base al tipo di file
+            if uploaded_file.type.startswith('image'):
+                image = Image.open(io.BytesIO(file_content))
+                st.image(image, caption=f"Uploaded {uploaded_file.name}", use_container_width=True)
+            elif uploaded_file.type == "application/pdf":
+                base64_pdf = base64.b64encode(file_content).decode('utf-8')
+                pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="500" type="application/pdf"></iframe>'
+                st.markdown(pdf_display, unsafe_allow_html=True)
+
             if st.session_state['extracted_data'] is None:
                 with st.spinner("Analizzando il documento..."):
                     logging.info("Analyzing the document...")
