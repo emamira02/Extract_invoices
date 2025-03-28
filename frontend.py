@@ -203,7 +203,7 @@ else:
                 logging.info(f"JSON file {st.session_state['uploaded_file_name']}_italiano.json downloaded successfully.")
 
             except Exception as e:
-                logging.error(f"Errore durante l'aggiornamento dei dati e il download: {e}")
+                logging.error(f"Error during the data update and download: {e}")
                 st.error(f"Errore durante l'aggiornamento dei dati e il download: {e}")
 
         return data_it
@@ -239,6 +239,7 @@ else:
         if temporary_file_path:
             if st.session_state['extracted_data'] is None:
                 with st.spinner("Analizzando il documento..."):
+                    logging.info("Analyzing the document...")
                     try:
                         with open(temporary_file_path, "rb") as f: 
                             file_content = f.read()
