@@ -79,6 +79,7 @@ else:
             </head>
             </html>
             """
+            logging.info(f"Download link created for {download_filename}")
             return dl_link
         except Exception as e:
             logging.error(f"Errore nella creazione del link di download: {e}")
@@ -117,6 +118,7 @@ else:
                 if file_PDF(file_content):
                     with open(temporary_file_path, "wb") as temporary_file:
                         temporary_file.write(file_content)
+                    logging.info(f"PDF file {uploaded_file.name} saved to temporary path.")
                     return temporary_file_path
                 else:
                     logging.warning(f"Invalid PDF file uploaded: {uploaded_file.name}")
@@ -127,6 +129,7 @@ else:
                 if file_IMG(file_content):
                     with open(temporary_file_path, "wb") as temporary_file:
                         temporary_file.write(file_content)
+                    logging.info(f"Image file {uploaded_file.name} saved to temporary path.")
                     return temporary_file_path
                 else:
                     logging.warning(f"Invalid {file_extension.upper()} file uploaded: {uploaded_file.name}")
@@ -197,6 +200,7 @@ else:
                     height=0,
                 )
                 st.success("Dati aggiornati e file JSON scaricato con successo!")
+                logging.info(f"JSON file {st.session_state['uploaded_file_name']}_italiano.json downloaded successfully.")
 
             except Exception as e:
                 logging.error(f"Errore durante l'aggiornamento dei dati e il download: {e}")
@@ -229,6 +233,7 @@ else:
             st.session_state['uploaded_file_name'] = uploaded_file.name
 
         st.success(f"File {uploaded_file.name} caricato con successo")
+        logging.info(f"File {uploaded_file.name} uploaded successfully.")
 
         temporary_file_path = handle_file_upload(uploaded_file)
         if temporary_file_path:
@@ -238,10 +243,12 @@ else:
                         with open(temporary_file_path, "rb") as f: 
                             file_content = f.read()
                             st.session_state['extracted_data'] = analyze_invoice(file_content)
+                        logging.info("Document analysis completed successfully.")
                     except Exception as e:
                         logging.error(f"Error during document analysis: {e}")
                         st.error(f"Error during document analysis: {e}")
                         st.session_state['extracted_data'] = None
+                        logging.error("Document analysis failed.")
 
             #se i dati estratti sono presenti usiamo la funzione per poter permettere la 
             #modifica di essi, in caso contrario restituisce un errore di estrazione dati
@@ -250,3 +257,7 @@ else:
                 edit_data(st.session_state['extracted_data'])
             else:
                 st.error("Impossibile estrarre i dati dal documento.")
+                logging.error("Failed to extract data from the document.")
+        else:
+            logging.warning("File upload failed.")
+            st.warning("File upload failed.")
