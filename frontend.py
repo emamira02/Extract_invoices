@@ -9,6 +9,8 @@ import base64
 from PIL import Image
 import streamlit.components.v1 as components
 from backend import analyze_invoice, download_button
+import fitz
+from PIL import ImageDraw
 
 # configuriamo la nostra pagina per visualizzare tutto centralmente, ed impostando il titolo
 st.set_page_config(
@@ -140,10 +142,44 @@ else:
             data_it["PIVA"] = st.text_input("PIVA", value=data.get("VendorTaxId", "N/A"), key="vendor_tax_id")
             data_it["Totale"] = st.text_input("Totale", value=data.get("InvoiceTotal", "N/A"), key="invoice_total")
 
+            doc = fitz.open(temporary_file_path)
+            page = doc[0]
+            blocks = page.get_text("blocks")
+            
+            # qua andiamo a creare un'immagine del pdf, creando un oggetto pixmap
+            # e convertendolo in un'immagine PIL, per poi disegnare sopra di essa dei rettangoli
+            # per evidenziare le aree di interesse, che andremo a colorare in rosso
+            # e blu in base alla presenza dei dati nel dizionario o nel dataframe 
+            pix = page.get_pixmap()
+            img = Image.open(io.BytesIO(pix.tobytes("png")))
+            draw = ImageDraw.Draw(img)
+
+            for block in blocks:
+                block_text = block[4]
+                for key, value in data_it.items():
+                    if value in block_text:
+                        rect = fitz.Rect(block[:4])
+                        draw.rectangle(
+                            [rect.x0, rect.y0, rect.x1, rect.y1],
+                            outline="red",
+                            width=2
+                        )
+
+                for item in lista_prodotti:
+                    for item_key, item_value in item.items():
+                        if str(item_value) in block_text:
+                            rect = fitz.Rect(block[:4])
+                            draw.rectangle(
+                                [rect.x0, rect.y0, rect.x1, rect.y1],
+                                outline="blue",
+                                width=2
+                            )
+            # qua mostriamo l'immagine con le aree evidenziate, e creiamo un bottone per il download
+            # del file json e per aggiornare i dati, con un messaggio di successo o errore
+            st.image(img, caption="PDF con aree evidenziate")
             submit_button = st.form_submit_button(label="Aggiorna e Scarica Dati")
 
         if submit_button:
-            #aggiorniamo i dati in italiano e creiamo un file json con essi per il download 
             json_data_italiano = {
                 "Nome Venditore": data_it["Nome Venditore"],
                 "Indirizzo Venditore": data_it["Indirizzo Venditore"],
@@ -174,6 +210,7 @@ else:
                 logging.error(f"Error during the data update and download: {e}")
                 st.error(f"Errore durante l'aggiornamento dei dati e il download: {e}")
             finally:
+                doc.close()
                 os.remove(temporary_file_path)
                 logging.info(f"Temporary file {temporary_file_path} deleted.")
 
@@ -210,15 +247,6 @@ else:
 
         if temporary_file_path:
 
-            #mostriamo l'immagine o il pdf caricato, in base al tipo di file
-            if uploaded_file.type.startswith('image'):
-                image = Image.open(io.BytesIO(file_content))
-                st.image(image, caption=f"Uploaded {uploaded_file.name}", use_container_width=True)
-            elif uploaded_file.type == "application/pdf":
-                base64_pdf = base64.b64encode(file_content).decode('utf-8')
-                pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="500" type="application/pdf"></iframe>'
-                st.markdown(pdf_display, unsafe_allow_html=True)
-
             if st.session_state['extracted_data'] is None:
                 with st.spinner("Analizzando il documento..."):
                     logging.info("Analyzing the document...")
@@ -232,9 +260,6 @@ else:
                         st.error(f"Error during document analysis: {e}")
                         st.session_state['extracted_data'] = None
                         logging.error("Document analysis failed.")
-                    finally:
-                        os.remove(temporary_file_path)
-                        logging.info(f"Temporary file {temporary_file_path} deleted.")
 
             #se i dati estratti sono presenti usiamo la funzione per poter permettere la 
             #modifica di essi, in caso contrario restituisce un errore di estrazione dati
