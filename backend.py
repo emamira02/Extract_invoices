@@ -4,9 +4,7 @@ from azure.core.credentials import AzureKeyCredential
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 import logging
 import json
-from io import BytesIO
 import base64
-import streamlit.components.v1 as components
 import pandas as pd
 
 # configuriamo tutti i parametri per chiamare correttamente la nostra Azure AI, creando un file client.ini
@@ -17,15 +15,6 @@ def client():
     endpoint = config.get('DocumentAI', 'endpoint')
     client = DocumentIntelligenceClient(endpoint=endpoint, credential=AzureKeyCredential(api_key))
     return client
-
-#qua definiamo una funzione che prende il percorso di un file come input e restituisce il contenuto del file
-#codificato come una stringa base64.
-def load_file_as_base64(file_path):
-    with open(file_path, "rb") as f:
-        data = f.read()
-    base64_bytes = base64.b64encode(data)
-    base64_string = base64_bytes.decode('utf-8')
-    return base64_string
 
 #qua andiamo a definire la nostra funzione per analizzare il nostro invoice, con 
 #parametro il contenuto del file, usando come modello uno preimpostato 'prebuilt-invoice',
