@@ -124,9 +124,10 @@ else:
         # che può essere modificata
         st.subheader("Lista di Prodotti")
         if "Items" in data:
-            df = pd.DataFrame(data["Items"])
-        else:
-            df = pd.DataFrame()
+            if data["Items"]:
+                df = pd.DataFrame(data["Items"])
+            else:
+                df = pd.DataFrame(columns=["Descrizione", "Codice Prodotto" , "Quantità", "PrezzoUnità", "Totale"])
 
         edited_df = st.data_editor(df, num_rows="dynamic", key="items_df") 
         lista_prodotti = edited_df.to_dict("records")
@@ -165,7 +166,8 @@ else:
             try:
 
                 ocr_doc = pymupdf.open("pdf", ocr_pdf_bytes)
-                page = ocr_doc[0]
+                for page_num in range(len(ocr_doc)):
+                    page = ocr_doc[page_num]
                 blocks = page.get_text("blocks")
                 pix2 = page.get_pixmap()
                 img = Image.open(io.BytesIO(pix2.tobytes("png")))
