@@ -5,11 +5,10 @@ import pandas as pd
 import os
 import io
 from io import BytesIO
-import base64
 from PIL import Image
 import streamlit.components.v1 as components
 from backend import analyze_invoice, download_button
-import fitz
+import pymupdf
 from PIL import ImageDraw
 
 # configuriamo la nostra pagina per visualizzare tutto centralmente, ed impostando il titolo
@@ -142,41 +141,65 @@ else:
             data_it["PIVA"] = st.text_input("PIVA", value=data.get("VendorTaxId", "N/A"), key="vendor_tax_id")
             data_it["Totale"] = st.text_input("Totale", value=data.get("InvoiceTotal", "N/A"), key="invoice_total")
 
-            doc = fitz.open(temporary_file_path)
-            page = doc[0]
-            blocks = page.get_text("blocks")
-            
-            # qua andiamo a creare un'immagine del pdf, creando un oggetto pixmap
-            # e convertendolo in un'immagine PIL, per poi disegnare sopra di essa dei rettangoli
-            # per evidenziare le aree di interesse, che andremo a colorare in rosso
-            # e blu in base alla presenza dei dati nel dizionario o nel dataframe 
-            pix = page.get_pixmap()
-            img = Image.open(io.BytesIO(pix.tobytes("png")))
-            draw = ImageDraw.Draw(img)
+            #andiamo ad aprire il file temporaneo in modo tale da poterlo usare per l'ocr, usando pymupdf con tesseract integrato
+            # e salvando il file in memoria, in modo tale da poterlo usare per l'ocr
+            try:
+                doc = pymupdf.open(temporary_file_path)
+                page = doc[0]
+                pix = page.get_pixmap()
 
-            for block in blocks:
-                block_text = block[4]
-                for key, value in data_it.items():
-                    if value in block_text:
-                        rect = fitz.Rect(block[:4])
-                        draw.rectangle(
-                            [rect.x0, rect.y0, rect.x1, rect.y1],
-                            outline="red",
-                            width=2
-                        )
+                ocr_pdf_bytes = pix.pdfocr_tobytes(
+                    compress=True,
+                    language='eng+ita',
+                    tessdata="C:/Program Files/Tesseract-OCR/tessdata"
+                )
 
-                for item in lista_prodotti:
-                    for item_key, item_value in item.items():
-                        if str(item_value) in block_text:
-                            rect = fitz.Rect(block[:4])
+                ocr_doc = pymupdf.open("pdf", ocr_pdf_bytes)
+
+            except Exception as e:
+                logging.error(f"Errore durante l'OCR e la generazione del PDF: {e}")
+                st.error(f"Errore durante l'OCR e la generazione del PDF: {e}")
+
+            #andiamo ad aprire il nostro file ocr pdf, prendiamo il testo della prima pagina dai blocchi e creiamo un'immagine
+            #con il pixmap, in modo tale da poter disegnare sopra l'immagine i rettangoli
+            try:
+
+                ocr_doc = pymupdf.open("pdf", ocr_pdf_bytes)
+                page = ocr_doc[0]
+                blocks = page.get_text("blocks")
+                pix2 = page.get_pixmap()
+                img = Image.open(io.BytesIO(pix2.tobytes("png")))
+                draw = ImageDraw.Draw(img)
+                #andiamo a disegnare i rettangoli sopra l'immagine, soltanto sui parametri presenti in data_it
+                #e sui prodotti presenti nella lista_prodotti, in modo tale da evidenziare i dati
+                for block in blocks:
+                    block_text = block[4]
+                    for key, value in data_it.items():
+                        if value in block_text:
+                            rect = pymupdf.Rect(block[:4])
                             draw.rectangle(
                                 [rect.x0, rect.y0, rect.x1, rect.y1],
-                                outline="blue",
+                                outline="red",
                                 width=2
                             )
-            # qua mostriamo l'immagine con le aree evidenziate, e creiamo un bottone per il download
-            # del file json e per aggiornare i dati, con un messaggio di successo o errore
-            st.image(img, caption="PDF con aree evidenziate")
+
+                    for item in lista_prodotti:
+                        for item_key, item_value in item.items():
+                            if str(item_value) in block_text:
+                                rect = pymupdf.Rect(block[:4])
+                                draw.rectangle(
+                                    [rect.x0, rect.y0, rect.x1, rect.y1],
+                                    outline="blue",
+                                    width=2
+                                )
+                # qua mostriamo l'immagine con le aree evidenziate, e creiamo un bottone per il download
+                # del file json e per aggiornare i dati, con un messaggio di successo o errore
+                st.image(img, caption="PDF con aree evidenziate")
+
+            except Exception as e:
+                logging.error(f"Errore durante il disegno dei rettangoli: {e}")
+                st.error(f"Errore durante il disegno dei rettangoli: {e}")
+
             submit_button = st.form_submit_button(label="Aggiorna e Scarica Dati")
 
         if submit_button:
@@ -200,7 +223,7 @@ else:
                 buff.seek(0)
 
                 components.html(
-                    download_button(buff.getvalue(), f"{st.session_state['uploaded_file_name']}_italiano.json"),
+                    download_button(buff.getvalue(), f"{st.session_state['uploaded_file_name']}.json"),
                     height=0,
                 )
                 st.success("Dati aggiornati e file JSON scaricato con successo!")
