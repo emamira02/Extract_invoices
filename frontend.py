@@ -17,13 +17,73 @@ load_dotenv()
 # configuriamo la nostra pagina per visualizzare tutto centralmente, ed impostando il titolo
 st.set_page_config(
     page_title="Data Extractor",
-    layout="centered"
+    layout="wide"
 )
 
-#inseriamo il logo dell'azienda nella nostra app
-st.logo("https://www.oaks.cloud/_next/static/media/oaks.13e2f970.svg",
+# andiamo a definire le traduzioni in un dizionario, in modo tale da poterle usare in base alla lingua selezionata
+translations = {
+    "IT": {
+        "welcome_title": "Benvenuto nel nostro potente Estrattore AI di Dati!",
+        "select_language": "Seleziona una lingua:",
+        "home": "Home",
+        "login_prompt": "Effettua il login per continuare",
+        "login_button": "Log in",
+        "logout_button": "Log out",
+        "greeting": "Ciao, **{name}**, {email}",
+        "extract_data_title": "Estrai :blue[Data] con :blue-background[Azure AI]",
+        "upload_label": "Carica una Fattura o una Ricevuta",
+        "success_upload": "File {file_name} caricato con successo",
+        "error_upload": "Errore durante l'analisi del documento: {error}",
+        "json_success": "Dati aggiornati e file JSON scaricato con successo!",
+        "json_error": "Errore durante l'aggiornamento dei dati e il download: {error}",
+        "product_list": "Lista di Prodotti",
+        "update_download_button": "Aggiorna e Scarica Dati",
+        "no_file_warning": "Non è stato caricato alcun file, seguire le istruzioni corrette",
+        "unsupported_file_error": "Tipo di file non supportato caricato: {file_name}",
+        "invalid_file_error": "File {file_type} non valido caricato: {file_name}",
+        "data_extraction_error": "Impossibile estrarre i dati dal documento.",
+        "analyzing_document": "Analizzando il documento...",
+        "ocr_error": "Errore durante l'OCR e la generazione del PDF: {error}",
+        "rectangle_error": "Errore durante il disegno dei rettangoli: {error}",
+    },
+    "EN": {
+        "welcome_title": "Welcome to your powerful AI Data Extractor!",
+        "select_language": "Select a language:",
+        "home": "Home",
+        "login_prompt": "Please log in to continue",
+        "login_button": "Log in",
+        "logout_button": "Log out",
+        "greeting": "Hello, **{name}**, {email}",
+        "extract_data_title": "Extract :blue[Data] with :blue-background[Azure AI]",
+        "upload_label": "Upload an Invoice or a Receipt",
+        "success_upload": "File {file_name} uploaded successfully",
+        "error_upload": "Error during document analysis: {error}",
+        "json_success": "Data updated and JSON file downloaded successfully!",
+        "json_error": "Error during the data update and download: {error}",
+        "product_list": "Product List",
+        "update_download_button": "Update and Download Data",
+        "no_file_warning": "There's no file uploaded, please follow the right instructions",
+        "unsupported_file_error": "Unsupported file type uploaded: {file_name}",
+        "invalid_file_error": "Invalid {file_type} file uploaded: {file_name}",
+        "data_extraction_error": "Failed to extract data from the document.",
+        "analyzing_document": "Analyzing the document...",
+        "ocr_error": "Error during OCR and PDF generation: {error}",
+        "rectangle_error": "Error during rectangle drawing: {error}",
+    }
+}
+
+with st.sidebar:
+    st.logo("https://www.oaks.cloud/_next/static/media/oaks.13e2f970.svg",    #inseriamo il logo dell'azienda nella nostra app
         size="large",
         link="https://www.oaks.cloud/")
+    st.title(f":blue-background[**{translations['IT']['home']}**]")
+    st.title(f"**{translations['IT']['select_language']}**")
+    lang = st.selectbox("**Choose an option**", ["IT", "EN"])
+
+# selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
+current_lang = translations[lang]
+
+st.title(f":blue-background[**{current_lang['welcome_title']}**]")
 
 # andiamo a configurare i nostri log, creando un file a parte per visualizzarli
 logging.basicConfig(
@@ -40,22 +100,22 @@ logging.basicConfig(
 #eseguire accesso tramite Microsoft Azure Entra
 if not st.experimental_user.is_logged_in:
     st.title("Microsoft Login:streamlit:")
-    st.subheader(":material/Login: Please log in to continue")
+    st.subheader(f":material/Login: {current_lang['login_prompt']}")
     logging.info("Launched app, waiting for the User Login.")
 
-    if st.button("Log in"):
+    if st.button(current_lang["login_button"]):
         st.login()
 
 else:
-    if st.button("Log out"):
+    if st.button(current_lang["logout_button"]):
         st.logout()
 
     if st.experimental_user.is_logged_in:
-        st.markdown(f"Hello, **{st.experimental_user.name}**, {st.experimental_user.email}")
+        st.markdown(current_lang["greeting"].format(name=st.experimental_user.name, email=st.experimental_user.email))
         logging.info(f"User {st.experimental_user.name} ({st.experimental_user.email}) successfully logged in.")
 
     # il titolo della nostra app con qualche edit estetico
-    st.markdown("# Extract :blue[Data] with :blue-background[Azure AI]")
+    st.markdown(f"# {current_lang['extract_data_title']}")
 
 
 #la funzione per gestire il file che viene caricato, se non è vuota allora il file
@@ -94,7 +154,7 @@ else:
                     return temporary_file_path, file_content
                 else:
                     logging.warning(f"Invalid PDF file uploaded: {uploaded_file.name}")
-                    st.error(f"Invalid PDF file uploaded: {uploaded_file.name}")
+                    st.error(current_lang["invalid_file_error"].format(file_type="PDF", file_name=uploaded_file.name))
                     return None, None
 
             elif file_extension in ("jpg", "jpeg", "png"):
@@ -105,34 +165,31 @@ else:
                     return temporary_file_path, file_content
                 else:
                     logging.warning(f"Invalid {file_extension.upper()} file uploaded: {uploaded_file.name}")
-                    st.error(f"Invalid {file_extension.upper()} file uploaded: {uploaded_file.name}")
+                    st.error(current_lang["invalid_file_error"].format(file_type=file_extension.upper(), file_name=uploaded_file.name))
                     return None, None
 
             else:
                 logging.warning(f"Unsupported file type uploaded: {file_type} - {uploaded_file.name}")
-                st.error(f"Unsupported file type uploaded: {uploaded_file.name}")
+                st.error(current_lang["unsupported_file_error"].format(file_name=uploaded_file.name))
                 return None, None
         else:
             logging.warning("There's no file uploaded, please follow the right instructions")
-            st.warning("There's no file uploaded, please follow the right instructions")
+            st.warning(current_lang["no_file_warning"])
             return None, None
 
 #definiamo una funziona avente come parametro i nostri dati
     def edit_data(data):
-
-#per mostrare solo i dati in italiano creiamo un dizionario al quale aggiungeremo tutti i parametri
         data_it = {}
 
         # questa è la nostra lista di prodotti in un dataframe, che in caso non ci sia nulla restituisci un dataframe vuoto
         # che può essere modificata
-        st.subheader("Lista di Prodotti")
         if "Items" in data:
             if data["Items"]:
                 df = pd.DataFrame(data["Items"])
             else:
-                df = pd.DataFrame(columns=["Descrizione", "Codice Prodotto" , "Quantità", "PrezzoUnità", "Totale"])
+                df = pd.DataFrame(columns=["Descrizione", "Codice Prodotto", "Quantità", "PrezzoUnità", "Totale"])
 
-        edited_df = st.data_editor(df, num_rows="dynamic", key="items_df") 
+        edited_df = st.data_editor(df, num_rows="dynamic", key="items_df")
         lista_prodotti = edited_df.to_dict("records")
 
         #creiamo un form per poter modificare i dati in italiano, con i parametri che andremo ad aggiornare
@@ -205,7 +262,7 @@ else:
                 logging.error(f"Errore durante il disegno dei rettangoli: {e}")
                 st.error(f"Errore durante il disegno dei rettangoli: {e}")
 
-            submit_button = st.form_submit_button(label="Aggiorna e Scarica Dati")
+            submit_button = st.form_submit_button(label=current_lang["update_download_button"])
 
         if submit_button:
             json_data_italiano = {
@@ -231,12 +288,12 @@ else:
                     download_button(buff.getvalue(), f"{st.session_state['uploaded_file_name']}.json"),
                     height=0,
                 )
-                st.success("Dati aggiornati e file JSON scaricato con successo!")
-                logging.info(f"JSON file {st.session_state['uploaded_file_name']}_italiano.json downloaded successfully.")
+                st.success(current_lang["json_success"])
+                logging.info(f"JSON file {st.session_state['uploaded_file_name']}.json downloaded successfully.")
 
             except Exception as e:
                 logging.error(f"Error during the data update and download: {e}")
-                st.error(f"Errore durante l'aggiornamento dei dati e il download: {e}")
+                st.error(current_lang["json_error"].format(error=e))
             finally:
                 doc.close()
                 os.remove(temporary_file_path)
@@ -246,7 +303,7 @@ else:
 
     #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
     uploaded_file = st.file_uploader(
-        label = "Upload an Invoice or a Receipt", 
+        label=current_lang["upload_label"], 
         type=["pdf", "jpg","png", "jpeg"],
         key="file_uploader"
         )
@@ -268,7 +325,7 @@ else:
             st.session_state['extracted_data'] = None  
             st.session_state['uploaded_file_name'] = uploaded_file.name
 
-        st.success(f"File {uploaded_file.name} caricato con successo")
+        st.success(current_lang["success_upload"].format(file_name=uploaded_file.name))
         logging.info(f"File {uploaded_file.name} uploaded successfully.")
 
         temporary_file_path, file_content = handle_file_upload(uploaded_file)
@@ -276,7 +333,7 @@ else:
         if temporary_file_path:
 
             if st.session_state['extracted_data'] is None:
-                with st.spinner("Analizzando il documento..."):
+                with st.spinner(current_lang["analyzing_document"]):
                     logging.info("Analyzing the document...")
                     try:
                         with open(temporary_file_path, "rb") as f: 
@@ -285,18 +342,18 @@ else:
                         logging.info("Document analysis completed successfully.")
                     except Exception as e:
                         logging.error(f"Error during document analysis: {e}")
-                        st.error(f"Error during document analysis: {e}")
+                        st.error(current_lang["error_upload"].format(error=e))
                         st.session_state['extracted_data'] = None
                         logging.error("Document analysis failed.")
 
             #se i dati estratti sono presenti usiamo la funzione per poter permettere la 
             #modifica di essi, in caso contrario restituisce un errore di estrazione dati
             if st.session_state['extracted_data']:
-                st.header("Dati Estratti")
+                st.header(current_lang["product_list"])
                 edit_data(st.session_state['extracted_data'])
             else:
-                st.error("Impossibile estrarre i dati dal documento.")
+                st.error(current_lang["data_extraction_error"])
                 logging.error("Failed to extract data from the document.")
         else:
             logging.warning("File upload failed.")
-            st.warning("File upload failed.")
+            st.warning(current_lang["no_file_warning"])
