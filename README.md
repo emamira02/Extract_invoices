@@ -1,93 +1,128 @@
-# receipt-extractor
+# Estrattore di Dati con Azure AI
 
+Questo progetto fornisce un'applicazione Streamlit che estrae dati da fatture e ricevute utilizzando Azure AI Document Intelligence. Consente agli utenti di caricare documenti, analizzarli, modificare i dati estratti e scaricare i risultati in formato JSON. L'applicazione gestisce anche il login utente tramite Microsoft Azure Entra ID.
 
+## Funzionalità
 
-## Getting started
+*   **Caricamento Documenti:** Supporta i formati di file PDF, JPG, JPEG e PNG.
+*   **Estrazione con Azure AI:** Utilizza Azure AI Document Intelligence per estrarre informazioni rilevanti da fatture e ricevute.
+*   **Modifica Dati:** Consente agli utenti di modificare i dati estratti in un'interfaccia intuitiva.
+*   **Visualizzazione Dati:** Evidenzia i dati estratti sull'immagine del documento.
+*   **Download JSON:** Fornisce un pulsante di download per i dati estratti e modificati in formato JSON.
+*   **Autenticazione Utente:** Protegge l'accesso con il login di Microsoft Azure Entra ID tramite Streamlit's `st.experimental_user`.
+*   **Dockerizzato:** Facilmente implementabile con Docker.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Prerequisiti
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+*   **Azure Subscription:** Una sottoscrizione Azure attiva con accesso ad Azure AI Document Intelligence.
+*   **Azure AI Document Intelligence Resource:** Una risorsa Document Intelligence creata nella tua sottoscrizione Azure. Avrai bisogno della chiave API e dell'endpoint per questa risorsa.
+*   **Microsoft Azure Entra ID:** Un Microsoft Azure Entra ID per l'autenticazione utente. Devi registrare un'applicazione in Azure AD e ottenere il Client ID e il Client Secret.
+*   **Python 3.12:** Python 3.12 o superiore installato.
+*   **Docker:** Docker installato per la containerizzazione.
 
-## Add your files
+## Configurazione
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+1.  **Clona il repository:**
 
-```
-cd existing_repo
-git remote add origin https://gitlab.oaks.cloud/oaks-projects/microsoft-apps/receipt-extractor.git
-git branch -M main
-git push -uf origin main
-```
+    ```bash
+    git clone <URL_del_repository>
+    cd <directory_del_repository>
+    ```
 
-## Integrate with your tools
+2.  **Configura le Credenziali Azure AI:**
 
-- [ ] [Set up project integrations](https://gitlab.oaks.cloud/oaks-projects/microsoft-apps/receipt-extractor/-/settings/integrations)
+    *   Crea un file chiamato `client.ini` nella directory principale del progetto.
+    *   Aggiungi il seguente contenuto a `client.ini`, sostituendo i segnaposto con la tua chiave API e URL endpoint effettivi:
 
-## Collaborate with your team
+        ```ini
+        [DocumentAI]
+        api_key = TUA_CHIAVE_API
+        endpoint = TUO_URL_ENDPOINT
+        ```
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+3.  **Configura l'Autenticazione con Microsoft Azure Entra ID:**
 
-## Test and Deploy
+    *   **Registra un'applicazione in Azure Active Directory (Azure AD):** Segui la documentazione Microsoft per registrare un'applicazione in Azure AD. Otterrai un *Client ID* e dovrai generare un *Client Secret*. Imposta l'URL di reindirizzamento (Redirect URI) dell'applicazione a `http://localhost:8501` (o l'URL dove la tua applicazione Streamlit sarà accessibile).  Se l'app è in produzione, usa l'URL di produzione.
 
-Use the built-in continuous integration in GitLab.
+    *   **Configura `secrets.toml`:** Crea una directory `.streamlit` (se non esiste) nella directory principale del tuo progetto. All'interno di `.streamlit`, crea un file chiamato `secrets.toml`.
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+    *   **Aggiungi le credenziali Azure AD a `secrets.toml`:**  Questo file conterrà le credenziali per l'autenticazione.  **Non committare questo file in un repository pubblico!**
 
-***
+        ```toml
+        [experimental.user]
+        client_id = "YOUR_CLIENT_ID"  # Sostituisci con il Client ID della tua app Azure AD
+        tenant_id = "YOUR_TENANT_ID"  #Sostituisci con il Tenant ID della tua app Azure AD
+        cookie_secret = ""  #Inserisci una stringa qualsiasi
+        client_secret = "YOUR_CLIENT_SECRET"  # Sostituisci con il Client Secret generato
+        redirect_uri = "http://localhost:8501" #Sostituisci con il corretto redirect URI
+        server_metadata_url = "YOUR_SERVER_URL"  #Sostituisci con il corretto URL del server metadata Microsoft   #Es.   https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0/.well-known/openid-configuration
+        allowed_emails = ["your_email@example.com", "another_email@example.com"] # opzionale: lista di email autorizzate
+        ```
 
-# Editing this README
+        *   Sostituisci `YOUR_CLIENT_ID`, `YOUR_TENANT_ID`, `YOUR_CLIENT_SECRET`, `YOUR_SERVER_URL`, `http://localhost:8501` con i valori corretti.
+        *   La sezione `allowed_emails` è opzionale. Se presente, solo gli utenti con gli indirizzi email elencati potranno accedere all'applicazione.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+4.  **Configura Tesseract OCR (Importante per una Migliore Qualità OCR):**
 
-## Suggestions for a good README
+    *   Sebbene l'applicazione utilizzi l'OCR Tesseract integrato in PyMuPDF, puoi migliorare significativamente la precisione dell'OCR installando Tesseract sulla tua macchina host e fornendo il percorso alla sua directory tessdata.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+    *   **Installa Tesseract:** Segui le istruzioni di installazione per il tuo sistema operativo. I metodi comuni includono:
 
-## Name
-Choose a self-explaining name for your project.
+        *   **Windows:** Scarica l'installer da [UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki) e installalo. Assicurati di aggiungere Tesseract alla variabile di ambiente PATH del tuo sistema durante l'installazione.
+        *   **macOS:** `brew install tesseract` (se usi Homebrew)
+        *   **Linux:** `sudo apt-get install tesseract-ocr` (Debian/Ubuntu) or `sudo yum install tesseract` (CentOS/RHEL)
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+    *   **Individua la directory `tessdata`:** Questa directory contiene i file di dati linguistici necessari per Tesseract. Il percorso tipico è:
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+        *   **Windows:** `C:\Program Files\Tesseract-OCR\tessdata`
+        *   **macOS:** `/usr/local/share/tessdata` (se installato con Homebrew)
+        *   **Linux:** `/usr/share/tesseract-ocr/tessdata`
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+    *   **Imposta la variabile d'ambiente `TESSDATA_PREFIX`:** Nel file `.env` (crealo se non esiste nella directory principale del progetto), aggiungi la seguente riga, sostituendo il percorso con quello corretto per il tuo sistema:
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+        ```
+        TESSDATA_PREFIX = /usr/local/share/tessdata/
+        ```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+        Assicurati che il percorso sia corretto. Se non è impostato o è errato, l'OCR potrebbe non funzionare correttamente.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+5.  **Installare le dipendenze Python:**
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+6.  **Crea l'immagine Docker (nella directory principale del progetto):**
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+    ```bash
+    docker build -t data-extractor .
+    ```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+7.  **Esegui il container Docker:**
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+    ```bash
+    docker-compose up -d
+    ```
 
-## License
-For open source projects, say how it is licensed.
+## Utilizzo
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+1.  Apri il browser e vai all'indirizzo `http://localhost:8501`.
+2.  Effettua il login con il tuo account Microsoft Azure Entra ID.
+3.  Carica un file di fattura o ricevuta in formato PDF, JPG, JPEG o PNG.
+4.  Attendi che l'applicazione analizzi il documento ed estragga i dati.
+5.  Visualizza e modifica i dati estratti nell'interfaccia utente.
+6.  Scarica i dati in formato JSON.
+
+## Note
+
+*   Per un corretto funzionamento del login di Microsoft, assicurati di aver configurato correttamente il file `.streamlit/secrets.toml` con il Client ID, Client Secret e Redirect URI corretti.
+*   L'accuratezza dell'estrazione dei dati dipende dalla qualità del documento di input e dalle capacità del modello Azure AI Document Intelligence.
+*   Se l'OCR non funziona correttamente, verifica che `TESSDATA_PREFIX` sia impostato correttamente e che i file di dati linguistici di Tesseract siano presenti nella directory specificata.
+* Il modello prebuilt-receipt nel backend, viene utilizzato per estrapolare solo il MerchantPhoneNumber e il TransactionTime, qualora siano presenti nel documento, poichè il modello prebuilt-invoice non li estrae.
+
+## Risoluzione dei problemi
+
+*   **Errore di autenticazione:** Verifica che le impostazioni di Azure Active Directory siano configurate correttamente e che il file `secrets.toml` contenga il Client ID, Client Secret e Redirect URI corretti. Verifica anche che l'URL di reindirizzamento nell'applicazione Azure AD corrisponda a quello configurato in `secrets.toml`.
+*   **Errore di estrazione dei dati:** Verifica che la chiave API e l'endpoint di Azure AI Document Intelligence siano corretti nel file `client.ini` e che la risorsa sia attiva nella tua sottoscrizione Azure.
+*   **OCR non funzionante:** Verifica che la variabile d'ambiente `TESSDATA_PREFIX` sia impostata correttamente e che i file di dati linguistici di Tesseract siano presenti nella directory specificata.
+*   **Errore di download:** Verifica i log dell'applicazione per identificare eventuali errori durante la creazione del link di download.
