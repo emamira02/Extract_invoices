@@ -6,3 +6,4 @@ pandas
 pillow
 authlib
 pymupdf
+dotenv

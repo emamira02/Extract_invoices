@@ -10,6 +10,9 @@ import streamlit.components.v1 as components
 from backend import analyze_invoice, download_button
 import pymupdf
 from PIL import ImageDraw
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # configuriamo la nostra pagina per visualizzare tutto centralmente, ed impostando il titolo
 st.set_page_config(
@@ -152,7 +155,7 @@ else:
                 ocr_pdf_bytes = pix.pdfocr_tobytes(
                     compress=True,
                     language='eng+ita',
-                    tessdata="C:/Program Files/Tesseract-OCR/tessdata"
+                    tessdata= load_dotenv("TESSDATA_PREFIX"),
                 )
 
                 ocr_doc = pymupdf.open("pdf", ocr_pdf_bytes)
