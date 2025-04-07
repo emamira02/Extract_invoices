@@ -5,3 +5,4 @@ app.log
 client.ini
 resources/
 .env
+invoice_data.db

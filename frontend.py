@@ -7,7 +7,7 @@ import io
 from io import BytesIO
 from PIL import Image
 import streamlit.components.v1 as components
-from backend import analyze_invoice, download_button
+from backend import analyze_invoice, download_button, view_data_from_db
 import pymupdf
 from PIL import ImageDraw
 from dotenv import load_dotenv
@@ -28,6 +28,8 @@ translations = {
         "home": "Home",
         "login_prompt": "Effettua il login per continuare",
         "login_button": "Log in",
+        "analysis_history": "Cronologia Analisi",
+        "history_info" : "Non è disponibile alcuna analisi in cronologia.",
         "logout_button": "Log out",
         "greeting": "Ciao, **{name}**, {email}",
         "extract_data_title": "Estrai :blue[Data] con :blue-background[Azure AI]",
@@ -54,6 +56,8 @@ translations = {
         "home": "Home",
         "login_prompt": "Please log in to continue",
         "login_button": "Log in",
+        "analysis_history": "Analysis History",
+        "history_info" : "No analysis history available.",
         "logout_button": "Log out",
         "greeting": "Hello, **{name}**, {email}",
         "extract_data_title": "Extract :blue[Data] with :blue-background[Azure AI]",
@@ -83,9 +87,23 @@ with st.sidebar:
     st.title(f":blue-background[**{translations['IT']['home']}**]")
     st.title(f"**{translations['IT']['select_language']}**")
     lang = st.selectbox("**Choose an option**", ["IT", "EN"])
-
 # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
-current_lang = translations[lang]
+    current_lang = translations[lang]
+
+    if st.button("View Analysis History"):
+        st.session_state['view_history'] = not st.session_state.get('view_history', False)
+#andiamo a visualizzare la cronologia delle analisi, se l'utente ha cliccato il bottone
+    if st.session_state.get('view_history', False):
+        st.title(current_lang["analysis_history"])
+        try:
+            history_data = view_data_from_db()
+            if history_data:
+                history_df = pd.DataFrame(history_data, columns=["ID", "Field Name", "Field Value"])
+                st.dataframe(history_df)
+            else:
+                st.info(current_lang["history_info"])
+        except Exception as e:
+            st.error(f"Error fetching analysis history: {e}")
 
 st.title(f":blue-background[**{current_lang['welcome_title']}**]")
 
