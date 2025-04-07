@@ -6,6 +6,7 @@ import logging
 import json
 import base64
 import pandas as pd
+import streamlit as st
 
 # configuriamo tutti i parametri per chiamare correttamente la nostra Azure AI, creando un file client.ini
 def client():
@@ -19,6 +20,7 @@ def client():
 #qua andiamo a definire la nostra funzione per analizzare il nostro invoice, con 
 #parametro il contenuto del file, usando come modello uno preimpostato 'prebuilt-invoice',
 
+@st.cache_data
 def analyze_invoice(file_content):
 
     invoice_ai_client = client()
@@ -113,6 +115,7 @@ def analyze_invoice(file_content):
         print(f"Error during document analysis: {e}") 
         return None
 
+@st.cache_data
 def analyze_receipt(file_content):
 
     receipt_ai_client = client()
