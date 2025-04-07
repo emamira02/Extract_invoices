@@ -37,6 +37,7 @@ translations = {
         "json_success": "Dati aggiornati e file JSON scaricato con successo!",
         "json_error": "Errore durante l'aggiornamento dei dati e il download: {error}",
         "product_list": "Lista di Prodotti",
+        "text_input": ["Nome Venditore","Indirizzo Venditore","Numero di telefono Venditore","Data","Orario","PIVA","Totale"],
         "update_download_button": "Aggiorna e Scarica Dati",
         "no_file_warning": "Non è stato caricato alcun file, seguire le istruzioni corrette",
         "unsupported_file_error": "Tipo di file non supportato caricato: {file_name}",
@@ -61,6 +62,7 @@ translations = {
         "json_success": "Data updated and JSON file downloaded successfully!",
         "json_error": "Error during the data update and download: {error}",
         "product_list": "Product List",
+        "text_input": ["Vendor Name", "Vendor Address", "Vendor Phone Number", "Date", "Time", "VAT Number", "Total"],
         "update_download_button": "Update and Download Data",
         "no_file_warning": "There's no file uploaded, please follow the right instructions",
         "unsupported_file_error": "Unsupported file type uploaded: {file_name}",
@@ -194,13 +196,13 @@ else:
 
         #creiamo un form per poter modificare i dati in italiano, con i parametri che andremo ad aggiornare
         with st.form(key="edit_form"):
-            data_it["Nome Venditore"] = st.text_input("Nome Venditore", value=data.get("VendorName", "N/A"), key="vendor_name")
-            data_it["Indirizzo Venditore"] = st.text_input("Indirizzo Venditore", value=data.get("VendorAddress", "N/A"), key="vendor_address")
-            data_it["Numero di telefono Venditore"] = st.text_input("Numero di telefono Venditore", value=data.get("MerchantPhoneNumber", "N/A"), key="vendor_phone")
-            data_it["Data"] = st.text_input("Data", value=data.get("InvoiceDate", "N/A"), key="invoice_date")
-            data_it["Orario"] = st.text_input("Orario", value=data.get("TransactionTime", "N/A"), key="transaction_time")
-            data_it["PIVA"] = st.text_input("PIVA", value=data.get("VendorTaxId", "N/A"), key="vendor_tax_id")
-            data_it["Totale"] = st.text_input("Totale", value=data.get("InvoiceTotal", "N/A"), key="invoice_total")
+            data_it["Nome Venditore"] = st.text_input(current_lang["text_input"][0], value=data.get("VendorName", "N/A"), key="vendor_name")
+            data_it["Indirizzo Venditore"] = st.text_input(current_lang["text_input"][1], value=data.get("VendorAddress", "N/A"), key="vendor_address")
+            data_it["Numero di telefono Venditore"] = st.text_input(current_lang["text_input"][2], value=data.get("MerchantPhoneNumber", "N/A"), key="vendor_phone")
+            data_it["Data"] = st.text_input(current_lang["text_input"][3], value=data.get("InvoiceDate", "N/A"), key="invoice_date")
+            data_it["Orario"] = st.text_input(current_lang["text_input"][4], value=data.get("TransactionTime", "N/A"), key="transaction_time")
+            data_it["PIVA"] = st.text_input(current_lang["text_input"][5], value=data.get("VendorTaxId", "N/A"), key="vendor_tax_id")
+            data_it["Totale"] = st.text_input(current_lang["text_input"][6], value=data.get("InvoiceTotal", "N/A"), key="invoice_total")
 
             #andiamo ad aprire il file temporaneo in modo tale da poterlo usare per l'ocr, usando pymupdf con tesseract integrato
             # e salvando il file in memoria, in modo tale da poterlo usare per l'ocr
