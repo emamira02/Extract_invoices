@@ -38,6 +38,7 @@ translations = {
         "json_error": "Errore durante l'aggiornamento dei dati e il download: {error}",
         "product_list": "Lista di Prodotti",
         "text_input": ["Nome Venditore","Indirizzo Venditore","Numero di telefono Venditore","Data","Orario","PIVA","Totale"],
+        "dataframe_columns": ["Descrizione", "Codice Prodotto", "Quantità", "PrezzoUnità", "Totale"],
         "update_download_button": "Aggiorna e Scarica Dati",
         "no_file_warning": "Non è stato caricato alcun file, seguire le istruzioni corrette",
         "unsupported_file_error": "Tipo di file non supportato caricato: {file_name}",
@@ -48,7 +49,7 @@ translations = {
         "rectangle_error": "Errore durante il disegno dei rettangoli: {error}",
     },
     "EN": {
-        "welcome_title": "Welcome to your powerful AI Data Extractor!",
+        "welcome_title": "Welcome to our powerful AI Data Extractor!",
         "select_language": "Select a language:",
         "home": "Home",
         "login_prompt": "Please log in to continue",
@@ -63,6 +64,7 @@ translations = {
         "json_error": "Error during the data update and download: {error}",
         "product_list": "Product List",
         "text_input": ["Vendor Name", "Vendor Address", "Vendor Phone Number", "Date", "Time", "VAT Number", "Total"],
+        "dataframe_columns": ["Description", "Product Code", "Quantity", "Unit Price", "Total"],
         "update_download_button": "Update and Download Data",
         "no_file_warning": "There's no file uploaded, please follow the right instructions",
         "unsupported_file_error": "Unsupported file type uploaded: {file_name}",
@@ -183,13 +185,15 @@ else:
     def edit_data(data):
         data_it = {}
 
-        # questa è la nostra lista di prodotti in un dataframe, che in caso non ci sia nulla restituisci un dataframe vuoto
-        # che può essere modificata
+        # qua creiamo una lista di dizionari per rappresentare gli elementi estratti e ciascun dizionario contiene le 
+        # colonne del dataframe come chiavi e i valori corrispondenti dagli elementi estratti
         if "Items" in data:
             if data["Items"]:
-                df = pd.DataFrame(data["Items"])
+                items = [{current_lang["dataframe_columns"][i]: item.get(key, None) 
+                        for i, key in enumerate(item.keys())} for item in data["Items"]]
+                df = pd.DataFrame(items, columns=current_lang["dataframe_columns"])
             else:
-                df = pd.DataFrame(columns=["Descrizione", "Codice Prodotto", "Quantità", "PrezzoUnità", "Totale"])
+                df = pd.DataFrame(columns=current_lang["dataframe_columns"])
 
         edited_df = st.data_editor(df, num_rows="dynamic", key="items_df")
         lista_prodotti = edited_df.to_dict("records")
