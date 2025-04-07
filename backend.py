@@ -7,6 +7,7 @@ import json
 import base64
 import pandas as pd
 import streamlit as st
+import sqlite3
 
 # configuriamo tutti i parametri per chiamare correttamente la nostra Azure AI, creando un file client.ini
 def client():
@@ -16,6 +17,76 @@ def client():
     endpoint = config.get('DocumentAI', 'endpoint')
     client = DocumentIntelligenceClient(endpoint=endpoint, credential=AzureKeyCredential(api_key))
     return client
+
+
+def create_database():
+    #creiamo il nostro database SQLite e la tabella per memorizzare i dati estratti
+    conn = sqlite3.connect('invoice_data.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS invoice_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            field_name TEXT,
+            field_value TEXT
+        )
+    ''')
+    if not cursor.fetchone():
+        cursor.execute('''CREATE TABLE invoice_data
+                          (field_name text, field_value text)''')
+        conn.commit()
+    conn.close()
+
+def insert_data_to_db(data_dict):
+    #inseriamo i dati estratti nel database SQLite
+    conn = sqlite3.connect('invoice_data.db')
+    cursor = conn.cursor()
+    
+    #per ogni campo del nostro dizionario andiamo ad inserire il valore e il nome del campo
+    for field_name, field_value in data_dict.items():
+        cursor.execute('''
+            INSERT INTO invoice_data (field_name, field_value) VALUES (?, ?)
+        ''', (field_name, field_value))
+    
+    conn.commit()
+    conn.close()
+
+
+def update_data_to_db(data_dict):
+    #aggiorniamo i dati estratti nel database SQLite
+    conn = sqlite3.connect('invoice_data.db')
+    cursor = conn.cursor()
+    
+    #per ogni campo del nostro dizionario andiamo ad aggiornare il valore e il nome del campo
+    for field_name, field_value in data_dict.items():
+        cursor.execute('''
+            UPDATE invoice_data SET field_value = ? WHERE field_name = ?
+        ''', (field_value, field_name))
+    
+    conn.commit()
+    conn.close()
+
+def view_data_from_db():
+    # Ensure the database and table exist before fetching data
+    conn = sqlite3.connect('invoice_data.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS invoice_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            field_name TEXT,
+            field_value TEXT
+        )
+    ''')
+    
+    cursor.execute('''
+        SELECT * FROM invoice_data
+    ''')
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return rows
+
 
 #qua andiamo a definire la nostra funzione per analizzare il nostro invoice, con 
 #parametro il contenuto del file, usando come modello uno preimpostato 'prebuilt-invoice',
