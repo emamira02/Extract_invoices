@@ -11,6 +11,7 @@ from backend import analyze_invoice, download_button, view_data_from_db
 import pymupdf
 from PIL import ImageDraw
 from dotenv import load_dotenv
+from fuzzywuzzy import fuzz
 
 load_dotenv()
 
@@ -236,7 +237,7 @@ else:
                 ocr_pdf_bytes = pix.pdfocr_tobytes(
                     compress=True,
                     language='eng+ita',
-                    tessdata= load_dotenv("TESSDATA_PREFIX"),
+                    tessdata= os.getenv("TESSDATA_PREFIX"),
                 )
 
                 ocr_doc = pymupdf.open("pdf", ocr_pdf_bytes)
@@ -256,31 +257,44 @@ else:
                 pix2 = page.get_pixmap()
                 img = Image.open(io.BytesIO(pix2.tobytes("png")))
                 draw = ImageDraw.Draw(img)
+
+            #qua andiamo a creare un dizionario per evidenziare i blocchi di testo,
+            # in modo tale da non evidenziare più volte lo stesso parametro
+                highlighted = {key: False for key in data_it}
+
+            #definiamo una funzione per evidenziare i blocchi di testo, in modo tale da poterli disegnare sopra l'immagine
+                #evidenziando i parametri che andiamo a modificare, in modo tale da poterli vedere meglio, impostiamo poi un margine
+                #per il disegno del rettangolo, in modo tale da non coprire il testo
+                def highlight_block(block, color):
+                    rect = pymupdf.Rect(block[:4])
+                    draw.rectangle(
+                        [rect.x0 - 4, rect.y0 - 4, rect.x1 + 4, rect.y1 + 4],
+                        outline=color,
+                        width=2
+                    )
+
                 #andiamo a disegnare i rettangoli sopra l'immagine, soltanto sui parametri presenti in data_it
                 #e sui prodotti presenti nella lista_prodotti, in modo tale da evidenziare i dati
                 for block in blocks:
                     block_text = block[4]
-                    for key, value in data_it.items():
-                        if value in block_text:
-                            rect = pymupdf.Rect(block[:4])
-                            draw.rectangle(
-                                [rect.x0, rect.y0, rect.x1, rect.y1],
-                                outline="red",
-                                width=2
-                            )
 
+                ##qua con un ciclo andiamo a verificare se il testo del blocco è presente nei dati estratti e se non è già evidenziato,
+                #allora se il modulo fuzzywuzzy trova una corrispondenza, evidenziamo il blocco e impostiamo il valore a True
+                    for key, value in data_it.items():
+                        if not highlighted[key] and fuzz.partial_ratio(value.lower(), block_text.lower()) > 80:  
+                            highlight_block(block, "red")
+                            highlighted[key] = True 
+
+                #stessa cosa di prima ma per i prodotti, in modo tale da evidenziare anche quelli, migliorando 
+                #l'analisi grazie al modulo fuzzywuzzy
                     for item in lista_prodotti:
                         for item_key, item_value in item.items():
-                            if str(item_value) in block_text:
-                                rect = pymupdf.Rect(block[:4])
-                                draw.rectangle(
-                                    [rect.x0, rect.y0, rect.x1, rect.y1],
-                                    outline="blue",
-                                    width=2
-                                )
-                # qua mostriamo l'immagine con le aree evidenziate, e creiamo un bottone per il download
+                            if fuzz.partial_ratio(str(item_value).lower(), block_text.lower()) > 80:
+                                highlight_block(block, "blue")
+
+                # qua mostriamo l'immagine con le aree evidenziate e width predefinita, e creiamo un bottone per il download
                 # del file json e per aggiornare i dati, con un messaggio di successo o errore
-                st.image(img, caption="PDF con aree evidenziate")
+                st.image(img, width = 500, caption="PDF con aree evidenziate")
 
             except Exception as e:
                 logging.error(f"Errore durante il disegno dei rettangoli: {e}")
@@ -319,6 +333,7 @@ else:
                 logging.error(f"Error during the data update and download: {e}")
                 st.error(current_lang["json_error"].format(error=e))
             finally:
+                ocr_doc.close()
                 doc.close()
                 os.remove(temporary_file_path)
                 logging.info(f"Temporary file {temporary_file_path} deleted.")
