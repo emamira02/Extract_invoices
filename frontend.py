@@ -7,13 +7,20 @@ import io
 from io import BytesIO
 from PIL import Image
 import streamlit.components.v1 as components
-from backend import analyze_invoice, download_button, view_data_from_db
+from backend import analyze_invoice, download_button
+from database import create_database, add_analisys_history, get_cronologia, get_dati_operazione
 import pymupdf
 from PIL import ImageDraw
 from dotenv import load_dotenv
 from fuzzywuzzy import fuzz
+import sqlite3
 
 load_dotenv()
+
+#andiamo a caricare i nostri file temporanei in una cartella specifica
+temp_files_dir = "temp_files"
+os.makedirs(temp_files_dir, exist_ok=True)
+
 
 # configuriamo la nostra pagina per visualizzare tutto centralmente, ed impostando il titolo
 st.set_page_config(
@@ -26,10 +33,11 @@ translations = {
     "IT": {
         "welcome_title": "Benvenuto nel nostro potente Estrattore AI di Dati!",
         "select_language": "Seleziona una lingua:",
-        "home": "Home",
+        "home": "Homepage",
         "login_prompt": "Effettua il login per continuare",
         "login_button": "Log in",
         "analysis_history": "Cronologia Analisi",
+        "analysis_info": "Informazioni sull'analisi",
         "history_info" : "Non è disponibile alcuna analisi in cronologia.",
         "logout_button": "Log out",
         "greeting": "Ciao, **{name}**, {email}",
@@ -47,6 +55,7 @@ translations = {
         "unsupported_file_error": "Tipo di file non supportato caricato: {file_name}",
         "invalid_file_error": "File {file_type} non valido caricato: {file_name}",
         "data_extraction_error": "Impossibile estrarre i dati dal documento.",
+        "temp_path" : "Il percorso temporaneo del file non è definito.",
         "analyzing_document": "Analizzando il documento...",
         "ocr_error": "Errore durante l'OCR e la generazione del PDF: {error}",
         "rectangle_error": "Errore durante il disegno dei rettangoli: {error}",
@@ -54,10 +63,11 @@ translations = {
     "EN": {
         "welcome_title": "Welcome to our powerful AI Data Extractor!",
         "select_language": "Select a language:",
-        "home": "Home",
+        "home": "Homepage",
         "login_prompt": "Please log in to continue",
         "login_button": "Log in",
         "analysis_history": "Analysis History",
+        "analysis_info": "Analysis Information",
         "history_info" : "No analysis history available.",
         "logout_button": "Log out",
         "greeting": "Hello, **{name}**, {email}",
@@ -75,36 +85,50 @@ translations = {
         "unsupported_file_error": "Unsupported file type uploaded: {file_name}",
         "invalid_file_error": "Invalid {file_type} file uploaded: {file_name}",
         "data_extraction_error": "Failed to extract data from the document.",
+        "temp_path" : "The temporary file path is not defined.",
         "analyzing_document": "Analyzing the document...",
         "ocr_error": "Error during OCR and PDF generation: {error}",
         "rectangle_error": "Error during rectangle drawing: {error}",
     }
 }
 
+#assicuriamoci che il nostro database venga creato e che la connessione venga aperta per 
+#poi connetterci ad esso e creare un cursore per eseguire le query
+create_database()
+conn = sqlite3.connect('cronologia.db')
+cursor = conn.cursor()
+
 with st.sidebar:
     st.logo("https://www.oaks.cloud/_next/static/media/oaks.13e2f970.svg",    #inseriamo il logo dell'azienda nella nostra app
         size="large",
         link="https://www.oaks.cloud/")
     st.title(f":blue-background[**{translations['IT']['home']}**]")
-    st.title(f"**{translations['IT']['select_language']}**")
+    st.header(f"**{translations['IT']['select_language']}**")
     lang = st.selectbox("**Choose an option**", ["IT", "EN"])
 # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
     current_lang = translations[lang]
 
-    if st.button("View Analysis History"):
-        st.session_state['view_history'] = not st.session_state.get('view_history', False)
-#andiamo a visualizzare la cronologia delle analisi, se l'utente ha cliccato il bottone
-    if st.session_state.get('view_history', False):
-        st.title(current_lang["analysis_history"])
-        try:
-            history_data = view_data_from_db()
-            if history_data:
-                history_df = pd.DataFrame(history_data, columns=["ID", "Field Name", "Field Value"])
-                st.dataframe(history_df)
-            else:
-                st.info(current_lang["history_info"])
-        except Exception as e:
-            st.error(f"Error fetching analysis history: {e}")
+#andiamo a mostrare la cronologia delle analisi effettuate mediante un selectbox, se non è vuota
+#allora mostriamo la cronologia, altrimenti mostriamo un messaggio di errore
+    operazioni = get_cronologia(cursor)
+    operazioni_names = [f"{operazione[1]} - {operazione[2]}" for operazione in operazioni]
+    selezione = st.selectbox(current_lang["analysis_history"], operazioni_names, key="history_sidebar")
+
+    if selezione:
+        id_operazione = operazioni[operazioni_names.index(selezione)][0]
+        if "all_history" not in st.session_state or st.session_state["all_history"] != id_operazione:
+            st.session_state["all_history"] = id_operazione
+            st.session_state['extracted_data'] = get_dati_operazione(id_operazione)
+            st.session_state['uploaded_file_name'] = selezione.split(" - ")[0]  # Aggiorniamo il nome del file caricato
+
+#andiamo a creare un temporary_file_path per il file caricato, in modo tale da 
+#poter risalire all'analisi e poterlo scaricare in un secondo momento, e lo salviamo nella cartella temp_files
+            temp_file_path = os.path.join(temp_files_dir, f"temp_{id_operazione}.pdf")
+            st.session_state['temporary_file_path'] = temp_file_path
+
+            with open(temp_file_path, "wb") as temp_file:
+                temp_file.write(json.dumps(st.session_state['extracted_data']).encode("utf-8"))
+            st.rerun() 
 
 st.title(f":blue-background[**{current_lang['welcome_title']}**]")
 
@@ -149,7 +173,7 @@ else:
             file_content = uploaded_file.read()
             file_type = uploaded_file.type
             file_extension = uploaded_file.name.split(".")[-1].lower()
-            temporary_file_path = f"temp.{file_extension}"
+            temporary_file_path = os.path.join(temp_files_dir, f"temp.{file_extension}")
 
 #definiamo la funzione per i PDF, di solito i primi bytes contengono %PDF quindi ci basta questo
 #per assicurarci lo sia, invece per le img, potendo avere schemi differenti, non sempre è così, quindi
@@ -201,7 +225,7 @@ else:
             return None, None
 
 #definiamo una funziona avente come parametro i nostri dati
-    def edit_data(data):
+    def edit_data(data, show_image_with_bbox=True):
         data_it = {}
 
         # qua creiamo una lista di dizionari per rappresentare gli elementi estratti e ciascun dizionario contiene le 
@@ -227,78 +251,76 @@ else:
             data_it["PIVA"] = st.text_input(current_lang["text_input"][5], value=data.get("VendorTaxId", "N/A"), key="vendor_tax_id")
             data_it["Totale"] = st.text_input(current_lang["text_input"][6], value=data.get("InvoiceTotal", "N/A"), key="invoice_total")
 
-            #andiamo ad aprire il file temporaneo in modo tale da poterlo usare per l'ocr, usando pymupdf con tesseract integrato
+        #poniamo una condizione per scegliere se mostrare o meno l'immagine con i bounding box, 
+        # ed andiamo ad aprire il file temporaneo in modo tale da poterlo usare per l'ocr, usando pymupdf con tesseract integrato
             # e salvando il file in memoria, in modo tale da poterlo usare per l'ocr
-            try:
-                doc = pymupdf.open(temporary_file_path)
-                page = doc[0]
-                pix = page.get_pixmap()
+            if show_image_with_bbox:
+                try:
+                    temporary_file_path = st.session_state.get('temporary_file_path')
+                    if not temporary_file_path:
+                        raise FileNotFoundError(current_lang["temp_path"])
 
-                ocr_pdf_bytes = pix.pdfocr_tobytes(
-                    compress=True,
-                    language='eng+ita',
-                    tessdata= os.getenv("TESSDATA_PREFIX"),
-                )
+                    doc = pymupdf.open(temporary_file_path)
+                    page = doc[0]
+                    pix = page.get_pixmap()
 
-                ocr_doc = pymupdf.open("pdf", ocr_pdf_bytes)
-
-            except Exception as e:
-                logging.error(f"Errore durante l'OCR e la generazione del PDF: {e}")
-                st.error(f"Errore durante l'OCR e la generazione del PDF: {e}")
-
+                    ocr_pdf_bytes = pix.pdfocr_tobytes(
+                        compress=True,
+                        language='eng+ita',
+                        tessdata= os.getenv("TESSDATA_PREFIX"),
+                    )
             #andiamo ad aprire il nostro file ocr pdf, prendiamo il testo della prima pagina dai blocchi e creiamo un'immagine
             #con il pixmap, in modo tale da poter disegnare sopra l'immagine i rettangoli
-            try:
 
-                ocr_doc = pymupdf.open("pdf", ocr_pdf_bytes)
-                for page_num in range(len(ocr_doc)):
-                    page = ocr_doc[page_num]
-                blocks = page.get_text("blocks")
-                pix2 = page.get_pixmap()
-                img = Image.open(io.BytesIO(pix2.tobytes("png")))
-                draw = ImageDraw.Draw(img)
+                    ocr_doc = pymupdf.open("pdf", ocr_pdf_bytes)
+                    for page_num in range(len(ocr_doc)):
+                        page = ocr_doc[page_num]
+                    blocks = page.get_text("blocks")
+                    pix2 = page.get_pixmap()
+                    img = Image.open(io.BytesIO(pix2.tobytes("png")))
+                    draw = ImageDraw.Draw(img)
 
             #qua andiamo a creare un dizionario per evidenziare i blocchi di testo,
             # in modo tale da non evidenziare più volte lo stesso parametro
-                highlighted = {key: False for key in data_it}
+                    highlighted = {key: False for key in data_it}
 
             #definiamo una funzione per evidenziare i blocchi di testo, in modo tale da poterli disegnare sopra l'immagine
                 #evidenziando i parametri che andiamo a modificare, in modo tale da poterli vedere meglio, impostiamo poi un margine
                 #per il disegno del rettangolo, in modo tale da non coprire il testo
-                def highlight_block(block, color):
-                    rect = pymupdf.Rect(block[:4])
-                    draw.rectangle(
-                        [rect.x0 - 4, rect.y0 - 4, rect.x1 + 4, rect.y1 + 4],
-                        outline=color,
-                        width=2
-                    )
+                    def highlight_block(block, color):
+                        rect = pymupdf.Rect(block[:4])
+                        draw.rectangle(
+                            [rect.x0 - 4, rect.y0 - 4, rect.x1 + 4, rect.y1 + 4],
+                            outline=color,
+                            width=2
+                        )
 
                 #andiamo a disegnare i rettangoli sopra l'immagine, soltanto sui parametri presenti in data_it
                 #e sui prodotti presenti nella lista_prodotti, in modo tale da evidenziare i dati
-                for block in blocks:
-                    block_text = block[4]
+                    for block in blocks:
+                        block_text = block[4]
 
                 ##qua con un ciclo andiamo a verificare se il testo del blocco è presente nei dati estratti e se non è già evidenziato,
                 #allora se il modulo fuzzywuzzy trova una corrispondenza, evidenziamo il blocco e impostiamo il valore a True
-                    for key, value in data_it.items():
-                        if not highlighted[key] and fuzz.partial_ratio(value.lower(), block_text.lower()) > 80:  
-                            highlight_block(block, "red")
-                            highlighted[key] = True 
+                        for key, value in data_it.items():
+                            if not highlighted[key] and fuzz.partial_ratio(value.lower(), block_text.lower()) > 80:  
+                                highlight_block(block, "red")
+                                highlighted[key] = True 
 
                 #stessa cosa di prima ma per i prodotti, in modo tale da evidenziare anche quelli, migliorando 
                 #l'analisi grazie al modulo fuzzywuzzy
-                    for item in lista_prodotti:
-                        for item_key, item_value in item.items():
-                            if fuzz.partial_ratio(str(item_value).lower(), block_text.lower()) > 80:
-                                highlight_block(block, "blue")
+                        for item in lista_prodotti:
+                            for item_key, item_value in item.items():
+                                if fuzz.partial_ratio(str(item_value).lower(), block_text.lower()) > 80:
+                                    highlight_block(block, "blue")
 
                 # qua mostriamo l'immagine con le aree evidenziate e width predefinita, e creiamo un bottone per il download
                 # del file json e per aggiornare i dati, con un messaggio di successo o errore
-                st.image(img, width = 500, caption="PDF con aree evidenziate")
+                    st.image(img, width=500, caption="PDF con aree evidenziate")
 
-            except Exception as e:
-                logging.error(f"Errore durante il disegno dei rettangoli: {e}")
-                st.error(f"Errore durante il disegno dei rettangoli: {e}")
+                except Exception as e:
+                    logging.error(f"Errore durante la generazione dell'immagine con bounding box: {e}")
+                    st.error(current_lang["rectangle_error"].format(error=e))
 
             submit_button = st.form_submit_button(label=current_lang["update_download_button"])
 
@@ -332,11 +354,6 @@ else:
             except Exception as e:
                 logging.error(f"Error during the data update and download: {e}")
                 st.error(current_lang["json_error"].format(error=e))
-            finally:
-                ocr_doc.close()
-                doc.close()
-                os.remove(temporary_file_path)
-                logging.info(f"Temporary file {temporary_file_path} deleted.")
 
         return data_it
 
@@ -370,6 +387,7 @@ else:
         temporary_file_path, file_content = handle_file_upload(uploaded_file)
 
         if temporary_file_path:
+            st.session_state['temporary_file_path'] = temporary_file_path
 
             if st.session_state['extracted_data'] is None:
                 with st.spinner(current_lang["analyzing_document"]):
@@ -387,12 +405,32 @@ else:
 
             #se i dati estratti sono presenti usiamo la funzione per poter permettere la 
             #modifica di essi, in caso contrario restituisce un errore di estrazione dati
+            #inoltre andiamo a salvare i dati estratti nel database, in modo tale da poterli
+            #recuperare in un secondo momento, e mostrare la cronologia delle analisi
             if st.session_state['extracted_data']:
                 st.header(current_lang["product_list"])
                 edit_data(st.session_state['extracted_data'])
+                add_analisys_history(conn, cursor, st.session_state['uploaded_file_name'], st.session_state['extracted_data'])
             else:
                 st.error(current_lang["data_extraction_error"])
                 logging.error("Failed to extract data from the document.")
         else:
             logging.warning("File upload failed.")
             st.warning(current_lang["no_file_warning"])
+
+#se la sessione è già stata avviata e i dati estratti sono presenti,
+#andiamo a mostrare la cronologia delle analisi effettuate, in modo tale da poterle visualizzare
+#ed usando la query_params per mostrare i dati estratti in base all'operazione selezionata
+    if "all_history" in st.session_state and st.session_state['extracted_data']:
+        st.header(current_lang["analysis_info"].format(st.session_state['uploaded_file_name']))
+        edit_data(st.session_state['extracted_data'], show_image_with_bbox=False)  
+
+    query_params = st.query_params
+    if "operazione" in query_params:
+        id_operazione = int(query_params["operazione"][0])
+        dati_operazione = get_dati_operazione(id_operazione)
+        if dati_operazione:
+            st.session_state['extracted_data'] = dati_operazione
+            st.session_state['uploaded_file_name'] = next(
+                (op[1] for op in operazioni if op[0] == id_operazione), None
+            )
