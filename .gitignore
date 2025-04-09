@@ -5,4 +5,5 @@ app.log
 client.ini
 resources/
 .env
-invoice_data.db
+temp_files/
+cronologia.db
