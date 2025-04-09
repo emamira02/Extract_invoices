@@ -8,7 +8,7 @@ from io import BytesIO
 from PIL import Image
 import streamlit.components.v1 as components
 from backend import analyze_invoice, download_button
-from database import create_database, add_analisys_history, get_cronologia, get_dati_operazione
+from database import create_database, add_analysis_history, get_crono, get_data_analysis, delete_oldest_analysis
 import pymupdf
 from PIL import ImageDraw
 from dotenv import load_dotenv
@@ -110,20 +110,20 @@ with st.sidebar:
 
 #andiamo a mostrare la cronologia delle analisi effettuate mediante un selectbox, se non è vuota
 #allora mostriamo la cronologia, altrimenti mostriamo un messaggio di errore
-    operazioni = get_cronologia(cursor)
-    operazioni_names = [f"{operazione[1]} - {operazione[2]}" for operazione in operazioni]
-    selezione = st.selectbox(current_lang["analysis_history"], operazioni_names, key="history_sidebar")
+    view_analysis = get_crono(cursor)
+    view_analysis_names = [f"{get_analysis[1]} - {get_analysis[2]}" for get_analysis in view_analysis]
+    selezione = st.selectbox(current_lang["analysis_history"], view_analysis_names, key="history_sidebar")
 
     if selezione:
-        id_operazione = operazioni[operazioni_names.index(selezione)][0]
-        if "all_history" not in st.session_state or st.session_state["all_history"] != id_operazione:
-            st.session_state["all_history"] = id_operazione
-            st.session_state['extracted_data'] = get_dati_operazione(cursor,id_operazione)
-            st.session_state['uploaded_file_name'] = selezione.split(" - ")[0]  # Aggiorniamo il nome del file caricato
+        id_get_analysis = view_analysis[view_analysis_names.index(selezione)][0]
+        if "all_history" not in st.session_state or st.session_state["all_history"] != id_get_analysis:
+            st.session_state["all_history"] = id_get_analysis
+            st.session_state['extracted_data'] = get_data_analysis(cursor,id_get_analysis)
+            st.session_state['uploaded_file_name'] = selezione.split(" - ")[0]
 
 #andiamo a creare un temporary_file_path per il file caricato, in modo tale da 
 #poter risalire all'analisi e poterlo scaricare in un secondo momento, e lo salviamo nella cartella temp_files
-            temp_file_path = os.path.join(temp_files_dir, f"temp_{id_operazione}.pdf")
+            temp_file_path = os.path.join(temp_files_dir, f"temp_{id_get_analysis}.pdf")
             st.session_state['temporary_file_path'] = temp_file_path
 
             with open(temp_file_path, "wb") as temp_file:
@@ -362,6 +362,15 @@ else:
 
         return data_it
 
+#andiamo a definire una funzione per eliminare il file temporaneo, in modo tale da non sovraccaricare il database
+#e mantenere solo le più recenti, in caso di errore restituisce un log di errore
+    def delete_temp_file(file_path):
+        try:
+            os.remove(file_path)
+            logging.info(f"Temporary file {file_path} deleted.")
+        except Exception as e:
+            logging.error(f"Error deleting temporary file {file_path}: {e}")
+
     #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
     uploaded_file = st.file_uploader(
         label=current_lang["upload_label"], 
@@ -375,6 +384,8 @@ else:
         st.session_state['extracted_data'] = None
     if 'uploaded_file_name' not in st.session_state:
         st.session_state['uploaded_file_name'] = None
+    if 'temporary_file_path' not in st.session_state:
+        st.session_state['temporary_file_path'] = None
 
 #se il file è stato caricato con successo , gestiamo l'upload con la nostra funzione
 #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto restituendo
@@ -385,6 +396,9 @@ else:
         if uploaded_file.name != st.session_state['uploaded_file_name']:
             st.session_state['extracted_data'] = None  
             st.session_state['uploaded_file_name'] = uploaded_file.name
+            if st.session_state['temporary_file_path']:
+                delete_temp_file(st.session_state['temporary_file_path'])
+                st.session_state['temporary_file_path'] = None
 
         st.success(current_lang["success_upload"].format(file_name=uploaded_file.name))
         logging.info(f"File {uploaded_file.name} uploaded successfully.")
@@ -392,7 +406,8 @@ else:
         temporary_file_path, file_content = handle_file_upload(uploaded_file)
 
         if temporary_file_path:
-            st.session_state['temporary_file_path'] = temporary_file_path
+            if st.session_state['extracted_data'] is None or st.session_state['temporary_file_path'] != temporary_file_path:
+                st.session_state['temporary_file_path'] = temporary_file_path
 
             if st.session_state['extracted_data'] is None:
                 with st.spinner(current_lang["analyzing_document"]):
@@ -415,7 +430,20 @@ else:
             if st.session_state['extracted_data']:
                 st.header(current_lang["product_list"])
                 edit_data(st.session_state['extracted_data'])
-                add_analisys_history(conn, cursor, st.session_state['uploaded_file_name'], st.session_state['extracted_data'])
+
+                #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
+                #andiamo a cancellare la più vecchia
+                view_analysis = get_crono(cursor)
+                if len(view_analysis) >= 10:
+                    
+                    oldest_analysis = view_analysis[-1] 
+                    oldest_id = oldest_analysis[0]
+                    oldest_temp_file_path = os.path.join(temp_files_dir, f"temp_{oldest_id}.pdf")
+                    delete_temp_file(oldest_temp_file_path)
+                    delete_oldest_analysis(conn, cursor)
+                    logging.info("Oldest analysis deleted to maintain history size limit.")
+
+                add_analysis_history(conn, cursor, st.session_state['uploaded_file_name'], st.session_state['extracted_data'])
             else:
                 st.error(current_lang["data_extraction_error"])
                 logging.error("Failed to extract data from the document.")
@@ -425,17 +453,17 @@ else:
 
 #se la sessione è già stata avviata e i dati estratti sono presenti,
 #andiamo a mostrare la cronologia delle analisi effettuate, in modo tale da poterle visualizzare
-#ed usando la query_params per mostrare i dati estratti in base all'operazione selezionata
+#ed usando la query_params per mostrare i dati estratti in base all'get_analysis selezionata
     if "all_history" in st.session_state and st.session_state['extracted_data']:
         st.header(current_lang["analysis_info"].format(st.session_state['uploaded_file_name']))
         edit_data(st.session_state['extracted_data'], show_image_with_bbox=False)  
 
     query_params = st.query_params
-    if "operazione" in query_params:
-        id_operazione = int(query_params["operazione"][0])
-        dati_operazione = get_dati_operazione(id_operazione)
-        if dati_operazione:
-            st.session_state['extracted_data'] = dati_operazione
+    if "get_analysis" in query_params:
+        id_get_analysis = int(query_params["get_analysis"][0])
+        dati_get_analysis = get_data_analysis(id_get_analysis)
+        if dati_get_analysis:
+            st.session_state['extracted_data'] = dati_get_analysis
             st.session_state['uploaded_file_name'] = next(
-                (op[1] for op in operazioni if op[0] == id_operazione), None
+                (op[1] for op in view_analysis if op[0] == id_get_analysis), None
             )
