@@ -118,7 +118,7 @@ with st.sidebar:
         id_operazione = operazioni[operazioni_names.index(selezione)][0]
         if "all_history" not in st.session_state or st.session_state["all_history"] != id_operazione:
             st.session_state["all_history"] = id_operazione
-            st.session_state['extracted_data'] = get_dati_operazione(id_operazione)
+            st.session_state['extracted_data'] = get_dati_operazione(cursor,id_operazione)
             st.session_state['uploaded_file_name'] = selezione.split(" - ")[0]  # Aggiorniamo il nome del file caricato
 
 #andiamo a creare un temporary_file_path per il file caricato, in modo tale da 
@@ -232,8 +232,13 @@ else:
         # colonne del dataframe come chiavi e i valori corrispondenti dagli elementi estratti
         if "Items" in data:
             if data["Items"]:
-                items = [{current_lang["dataframe_columns"][i]: item.get(key, None) 
-                        for i, key in enumerate(item.keys())} for item in data["Items"]]
+                items = []
+                for item in data["Items"]:
+                    item_dict = {}
+                    for i, key in enumerate(item.keys()):
+                        column_name = current_lang["dataframe_columns"][i]
+                        item_dict[column_name] = item.get(key, None)
+                    items.append(item_dict)
                 df = pd.DataFrame(items, columns=current_lang["dataframe_columns"])
             else:
                 df = pd.DataFrame(columns=current_lang["dataframe_columns"])
