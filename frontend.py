@@ -108,28 +108,6 @@ with st.sidebar:
 # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
     current_lang = translations[lang]
 
-#andiamo a mostrare la cronologia delle analisi effettuate mediante un selectbox, se non è vuota
-#allora mostriamo la cronologia, altrimenti mostriamo un messaggio di errore
-    view_analysis = get_crono(cursor)
-    view_analysis_names = [f"{get_analysis[1]} - {get_analysis[2]}" for get_analysis in view_analysis]
-    selezione = st.selectbox(current_lang["analysis_history"], view_analysis_names, key="history_sidebar")
-
-    if selezione:
-        id_get_analysis = view_analysis[view_analysis_names.index(selezione)][0]
-        if "all_history" not in st.session_state or st.session_state["all_history"] != id_get_analysis:
-            st.session_state["all_history"] = id_get_analysis
-            st.session_state['extracted_data'] = get_data_analysis(cursor,id_get_analysis)
-            st.session_state['uploaded_file_name'] = selezione.split(" - ")[0]
-
-#andiamo a creare un temporary_file_path per il file caricato, in modo tale da 
-#poter risalire all'analisi e poterlo scaricare in un secondo momento, e lo salviamo nella cartella temp_files
-            temp_file_path = os.path.join(temp_files_dir, f"temp_{id_get_analysis}.pdf")
-            st.session_state['temporary_file_path'] = temp_file_path
-
-            with open(temp_file_path, "wb") as temp_file:
-                temp_file.write(json.dumps(st.session_state['extracted_data']).encode("utf-8"))
-            st.rerun() 
-
 st.title(f":blue-background[**{current_lang['welcome_title']}**]")
 
 # andiamo a configurare i nostri log, creando un file a parte per visualizzarli
@@ -162,8 +140,30 @@ else:
         logging.info(f"User {st.experimental_user.name} ({st.experimental_user.email}) successfully logged in.")
 
     # il titolo della nostra app con qualche edit estetico
-    st.markdown(f"# {current_lang['extract_data_title']}")
+        st.markdown(f"# {current_lang['extract_data_title']}")
 
+    with st.sidebar:
+    #andiamo a mostrare la cronologia delle analisi effettuate mediante un selectbox, se non è vuota
+    #allora mostriamo la cronologia, altrimenti mostriamo un messaggio di errore
+        view_analysis = get_crono(cursor)
+        view_analysis_names = [f"{get_analysis[1]} - {get_analysis[2]}" for get_analysis in view_analysis]
+        selezione = st.selectbox(current_lang["analysis_history"], view_analysis_names, key="history_sidebar")
+
+        if selezione:
+            id_get_analysis = view_analysis[view_analysis_names.index(selezione)][0]
+            if "all_history" not in st.session_state or st.session_state["all_history"] != id_get_analysis:
+                st.session_state["all_history"] = id_get_analysis
+                st.session_state['extracted_data'] = get_data_analysis(cursor,id_get_analysis)
+                st.session_state['uploaded_file_name'] = selezione.split(" - ")[0]
+
+    #andiamo a creare un temporary_file_path per il file caricato, in modo tale da 
+    #poter risalire all'analisi e poterlo scaricare in un secondo momento, e lo salviamo nella cartella temp_files
+                temp_file_path = os.path.join(temp_files_dir, f"temp_{id_get_analysis}.pdf")
+                st.session_state['temporary_file_path'] = temp_file_path
+
+                with open(temp_file_path, "wb") as temp_file:
+                    temp_file.write(json.dumps(st.session_state['extracted_data']).encode("utf-8"))
+                st.rerun()
 
 #la funzione per gestire il file che viene caricato, se non è vuota allora il file
 #viene letto, andando a verificare però che il file sia un file pdf, ed in caso creando
