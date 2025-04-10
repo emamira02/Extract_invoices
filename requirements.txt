@@ -8,4 +8,4 @@ authlib
 pymupdf
 dotenv
 fuzzywuzzy
-sqlite3
+python-Levenshtein

@@ -14,7 +14,7 @@ RUN git clone https://github.com/tesseract-ocr/tesseract.git && cd tesseract && 
 ADD resources /usr/local/share/tessdata
 
 # Copia solo i file necessari
-COPY frontend.py backend.py ./
+COPY frontend.py backend.py database.py ./
 
 ENV TESSDATA_PREFIX=/usr/local/share/tessdata/
 
