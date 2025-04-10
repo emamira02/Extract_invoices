@@ -147,16 +147,16 @@ else:
     #allora mostriamo la cronologia, altrimenti mostriamo un messaggio di errore
         view_analysis = get_crono(cursor)
         view_analysis_names = [f"{get_analysis[1]} - {get_analysis[2]}" for get_analysis in view_analysis]
-        selezione = st.selectbox(current_lang["analysis_history"], view_analysis_names, key="history_sidebar")
+        selection = st.selectbox(current_lang["analysis_history"], view_analysis_names, key="history_sidebar")
 
         #quando l'utente seleziona un'analisi dalla cronologia, recupera il blob salvato nel database
         #e lo salva in un file temporaneo, in modo tale da poterlo usare.
-        if selezione:
-            id_get_analysis = view_analysis[view_analysis_names.index(selezione)][0]
+        if selection:
+            id_get_analysis = view_analysis[view_analysis_names.index(selection)][0]
             if "all_history" not in st.session_state or st.session_state["all_history"] != id_get_analysis:
                 st.session_state["all_history"] = id_get_analysis
                 st.session_state['extracted_data'] = get_data_analysis(cursor, id_get_analysis)
-                st.session_state['uploaded_file_name'] = selezione.split(" - ")[0]
+                st.session_state['uploaded_file_name'] = selection.split(" - ")[0]
 
                 #qua andiamo a creare un file temporaneo per il blob salvato nel database
                 temp_file_path = os.path.join(temp_files_dir, f"temp_{id_get_analysis}.pdf")
