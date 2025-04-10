@@ -8,7 +8,7 @@ from io import BytesIO
 from PIL import Image
 import streamlit.components.v1 as components
 from backend import analyze_invoice, download_button
-from database import create_database, add_analysis_history, get_crono, get_data_analysis, delete_oldest_analysis
+from database import create_database, add_analysis_history, get_crono, get_data_analysis, delete_oldest_analysis, insert_blob_data
 import pymupdf
 from PIL import ImageDraw
 from dotenv import load_dotenv
@@ -149,20 +149,32 @@ else:
         view_analysis_names = [f"{get_analysis[1]} - {get_analysis[2]}" for get_analysis in view_analysis]
         selezione = st.selectbox(current_lang["analysis_history"], view_analysis_names, key="history_sidebar")
 
+        #quando l'utente seleziona un'analisi dalla cronologia, recupera il blob salvato nel database
+        #e lo salva in un file temporaneo, in modo tale da poterlo usare.
         if selezione:
             id_get_analysis = view_analysis[view_analysis_names.index(selezione)][0]
             if "all_history" not in st.session_state or st.session_state["all_history"] != id_get_analysis:
                 st.session_state["all_history"] = id_get_analysis
-                st.session_state['extracted_data'] = get_data_analysis(cursor,id_get_analysis)
+                st.session_state['extracted_data'] = get_data_analysis(cursor, id_get_analysis)
                 st.session_state['uploaded_file_name'] = selezione.split(" - ")[0]
 
-    #andiamo a creare un temporary_file_path per il file caricato, in modo tale da 
-    #poter risalire all'analisi e poterlo scaricare in un secondo momento, e lo salviamo nella cartella temp_files
+                #qua andiamo a creare un file temporaneo per il blob salvato nel database
                 temp_file_path = os.path.join(temp_files_dir, f"temp_{id_get_analysis}.pdf")
                 st.session_state['temporary_file_path'] = temp_file_path
 
-                with open(temp_file_path, "wb") as temp_file:
-                    temp_file.write(json.dumps(st.session_state['extracted_data']).encode("utf-8"))
+                try:
+                    blob_data = st.session_state['extracted_data'].get("file_blob")
+                    if blob_data:
+                        with open(temp_file_path, "wb") as temp_file:
+                            temp_file.write(blob_data)
+                        logging.info(f"Temporary file {temp_file_path} recreated successfully.")
+                    else:
+                        logging.warning("Blob data not found in the extracted data.")
+                        st.error("I dati del file per questa analisi sono mancanti.")
+                except Exception as e:
+                    logging.error(f"Error recreating temporary file: {e}")
+                    st.error(current_lang["rectangle_error"].format(error=e))
+
                 st.rerun()
 
 #la funzione per gestire il file che viene caricato, se non è vuota allora il file
@@ -366,8 +378,11 @@ else:
 #e mantenere solo le più recenti, in caso di errore restituisce un log di errore
     def delete_temp_file(file_path):
         try:
-            os.remove(file_path)
-            logging.info(f"Temporary file {file_path} deleted.")
+            if os.path.exists(file_path): 
+                os.remove(file_path)
+                logging.info(f"Temporary file {file_path} deleted.")
+            else:
+                logging.warning(f"Temporary file {file_path} does not exist.")
         except Exception as e:
             logging.error(f"Error deleting temporary file {file_path}: {e}")
 
@@ -416,6 +431,7 @@ else:
                         with open(temporary_file_path, "rb") as f: 
                             file_content = f.read()
                             st.session_state['extracted_data'] = analyze_invoice(file_content)
+                            st.session_state['extracted_data']["file_blob"] = file_content
                         logging.info("Document analysis completed successfully.")
                     except Exception as e:
                         logging.error(f"Error during document analysis: {e}")
@@ -443,7 +459,12 @@ else:
                     delete_oldest_analysis(conn, cursor)
                     logging.info("Oldest analysis deleted to maintain history size limit.")
 
-                add_analysis_history(conn, cursor, st.session_state['uploaded_file_name'], st.session_state['extracted_data'])
+                # rimuoviamo temporaneamente il blob dai dati estratti ed usiamo add_analysis_history per salvare 
+                # sia i dati estratti che il file come blob, per poi ripristinare il blob
+                file_blob = st.session_state['extracted_data'].pop("file_blob", None)
+                add_analysis_history(conn, cursor, st.session_state['uploaded_file_name'], st.session_state['extracted_data'], file_blob)
+                if file_blob: 
+                    st.session_state['extracted_data']["file_blob"] = file_blob
             else:
                 st.error(current_lang["data_extraction_error"])
                 logging.error("Failed to extract data from the document.")
@@ -456,7 +477,7 @@ else:
 #ed usando la query_params per mostrare i dati estratti in base all'get_analysis selezionata
     if "all_history" in st.session_state and st.session_state['extracted_data']:
         st.header(current_lang["analysis_info"].format(st.session_state['uploaded_file_name']))
-        edit_data(st.session_state['extracted_data'], show_image_with_bbox=False)  
+        edit_data(st.session_state['extracted_data'], show_image_with_bbox=True)
 
     query_params = st.query_params
     if "get_analysis" in query_params:
