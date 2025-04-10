@@ -3,7 +3,6 @@ __pycache__/
 .streamlit/secrets.toml
 app.log
 client.ini
-resources/
 .env
 temp_files/
 cronologia.db
