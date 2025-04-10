@@ -237,7 +237,7 @@ else:
             return None, None
 
 #definiamo una funziona avente come parametro i nostri dati
-    def edit_data(data, show_image_with_bbox=True):
+    def edit_data(data, key_prefix="", show_image_with_bbox=True):
         data_it = {}
 
         # qua creiamo una lista di dizionari per rappresentare gli elementi estratti e ciascun dizionario contiene le 
@@ -255,18 +255,18 @@ else:
             else:
                 df = pd.DataFrame(columns=current_lang["dataframe_columns"])
 
-        edited_df = st.data_editor(df, num_rows="dynamic", key="items_df")
+        edited_df = st.data_editor(df, num_rows="dynamic", key=f"{key_prefix}_items_df")
         lista_prodotti = edited_df.to_dict("records")
 
         #creiamo un form per poter modificare i dati in italiano, con i parametri che andremo ad aggiornare
-        with st.form(key="edit_form"):
-            data_it["Nome Venditore"] = st.text_input(current_lang["text_input"][0], value=data.get("VendorName", "N/A"), key="vendor_name")
-            data_it["Indirizzo Venditore"] = st.text_input(current_lang["text_input"][1], value=data.get("VendorAddress", "N/A"), key="vendor_address")
-            data_it["Numero di telefono Venditore"] = st.text_input(current_lang["text_input"][2], value=data.get("MerchantPhoneNumber", "N/A"), key="vendor_phone")
-            data_it["Data"] = st.text_input(current_lang["text_input"][3], value=data.get("InvoiceDate", "N/A"), key="invoice_date")
-            data_it["Orario"] = st.text_input(current_lang["text_input"][4], value=data.get("TransactionTime", "N/A"), key="transaction_time")
-            data_it["PIVA"] = st.text_input(current_lang["text_input"][5], value=data.get("VendorTaxId", "N/A"), key="vendor_tax_id")
-            data_it["Totale"] = st.text_input(current_lang["text_input"][6], value=data.get("InvoiceTotal", "N/A"), key="invoice_total")
+        with st.form(key=f"{key_prefix}_edit_form"):
+            data_it["Nome Venditore"] = st.text_input(current_lang["text_input"][0], value=data.get("VendorName", "N/A"), key=f"{key_prefix}_vendor_name")
+            data_it["Indirizzo Venditore"] = st.text_input(current_lang["text_input"][1], value=data.get("VendorAddress", "N/A"), key=f"{key_prefix}_vendor_address")
+            data_it["Numero di telefono Venditore"] = st.text_input(current_lang["text_input"][2], value=data.get("MerchantPhoneNumber", "N/A"), key=f"{key_prefix}_vendor_phone")
+            data_it["Data"] = st.text_input(current_lang["text_input"][3], value=data.get("InvoiceDate", "N/A"), key=f"{key_prefix}_invoice_date")
+            data_it["Orario"] = st.text_input(current_lang["text_input"][4], value=data.get("TransactionTime", "N/A"), key=f"{key_prefix}_transaction_time")
+            data_it["PIVA"] = st.text_input(current_lang["text_input"][5], value=data.get("VendorTaxId", "N/A"), key=f"{key_prefix}_vendor_tax_id")
+            data_it["Totale"] = st.text_input(current_lang["text_input"][6], value=data.get("InvoiceTotal", "N/A"), key=f"{key_prefix}_invoice_total")
 
         #poniamo una condizione per scegliere se mostrare o meno l'immagine con i bounding box, 
         # ed andiamo ad aprire il file temporaneo in modo tale da poterlo usare per l'ocr, usando pymupdf con tesseract integrato
@@ -445,13 +445,13 @@ else:
             #recuperare in un secondo momento, e mostrare la cronologia delle analisi
             if st.session_state['extracted_data']:
                 st.header(current_lang["product_list"])
-                edit_data(st.session_state['extracted_data'])
+                edit_data(st.session_state['extracted_data'], key_prefix="new_upload")
 
                 #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
                 #andiamo a cancellare la più vecchia
                 view_analysis = get_crono(cursor)
                 if len(view_analysis) >= 10:
-                    
+
                     oldest_analysis = view_analysis[-1] 
                     oldest_id = oldest_analysis[0]
                     oldest_temp_file_path = os.path.join(temp_files_dir, f"temp_{oldest_id}.pdf")
@@ -477,7 +477,7 @@ else:
 #ed usando la query_params per mostrare i dati estratti in base all'get_analysis selezionata
     if "all_history" in st.session_state and st.session_state['extracted_data']:
         st.header(current_lang["analysis_info"].format(st.session_state['uploaded_file_name']))
-        edit_data(st.session_state['extracted_data'], show_image_with_bbox=True)
+        edit_data(st.session_state['extracted_data'], key_prefix="history_view", show_image_with_bbox=True)
 
     query_params = st.query_params
     if "get_analysis" in query_params:
