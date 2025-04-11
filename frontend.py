@@ -153,6 +153,13 @@ else:
         #e lo salva in un file temporaneo, in modo tale da poterlo usare.
         if selection:
             id_get_analysis = view_analysis[view_analysis_names.index(selection)][0]
+            #andiamo a creare una chiave di sessione per la cronologia, in modo tale da non sovrascrivere
+            #le analisi precedenti, e andiamo a verificare se la chiave è presente nella sessione
+            history_session_key = f"history_{id_get_analysis}"
+
+            if history_session_key not in st.session_state:
+                st.session_state[history_session_key] = {}
+            
             if "all_history" not in st.session_state or st.session_state["all_history"] != id_get_analysis:
                 st.session_state["all_history"] = id_get_analysis
                 st.session_state['extracted_data'] = get_data_analysis(cursor, id_get_analysis)
@@ -160,7 +167,7 @@ else:
 
                 #qua andiamo a creare un file temporaneo per il blob salvato nel database
                 temp_file_path = os.path.join(temp_files_dir, f"temp_{id_get_analysis}.pdf")
-                st.session_state['temporary_file_path'] = temp_file_path
+                st.session_state[history_session_key]['temporary_file_path'] = temp_file_path
 
                 try:
                     blob_data = st.session_state['extracted_data'].get("file_blob")
@@ -274,7 +281,14 @@ else:
             # e salvando il file in memoria, in modo tale da poterlo usare per l'ocr
             if show_image_with_bbox:
                 try:
-                    temporary_file_path = st.session_state.get('temporary_file_path')
+                    #poniamo la condizione che, se key prefix è history_view, allora andiamo a prendere il file temporaneo
+                    #dal dict nella sessione, altrimenti andiamo a prendere il file temporaneo dalla sessione
+                    if key_prefix == "history_view":
+                        history_session_key = f"history_{st.session_state['all_history']}"
+                        temporary_file_path = st.session_state[history_session_key].get('temporary_file_path')
+                    else:
+                         temporary_file_path = st.session_state.get('temporary_file_path')
+                    
                     if not temporary_file_path:
                         raise FileNotFoundError(current_lang["temp_path"])
 
