@@ -8,7 +8,7 @@ from io import BytesIO
 from PIL import Image
 import streamlit.components.v1 as components
 from backend import analyze_invoice, download_button
-from database import create_database, add_analysis_history, get_crono, get_data_analysis, delete_oldest_analysis, insert_blob_data
+from database import create_database, add_analysis_history, get_crono, get_data_analysis, delete_oldest_analysis
 import pymupdf
 from PIL import ImageDraw
 from dotenv import load_dotenv
@@ -175,6 +175,7 @@ else:
                     logging.error(f"Error recreating temporary file: {e}")
                     st.error(current_lang["rectangle_error"].format(error=e))
 
+                st.session_state['analysis_source'] = 'history'
                 st.rerun()
 
 #la funzione per gestire il file che viene caricato, se non è vuota allora il file
@@ -401,6 +402,8 @@ else:
         st.session_state['uploaded_file_name'] = None
     if 'temporary_file_path' not in st.session_state:
         st.session_state['temporary_file_path'] = None
+    if 'analysis_source' not in st.session_state:
+        st.session_state['analysis_source'] = None
 
 #se il file è stato caricato con successo , gestiamo l'upload con la nostra funzione
 #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto restituendo
@@ -433,6 +436,7 @@ else:
                             st.session_state['extracted_data'] = analyze_invoice(file_content)
                             st.session_state['extracted_data']["file_blob"] = file_content
                         logging.info("Document analysis completed successfully.")
+                        st.session_state['analysis_source'] = 'new'
                     except Exception as e:
                         logging.error(f"Error during document analysis: {e}")
                         st.error(current_lang["error_upload"].format(error=e))
@@ -444,27 +448,30 @@ else:
             #inoltre andiamo a salvare i dati estratti nel database, in modo tale da poterli
             #recuperare in un secondo momento, e mostrare la cronologia delle analisi
             if st.session_state['extracted_data']:
-                st.header(current_lang["product_list"])
-                edit_data(st.session_state['extracted_data'], key_prefix="new_upload")
+                if st.session_state['analysis_source'] == 'new':
+                    st.header(current_lang["product_list"])
+                    edit_data(st.session_state['extracted_data'], key_prefix="new_upload")
 
-                #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
-                #andiamo a cancellare la più vecchia
-                view_analysis = get_crono(cursor)
-                if len(view_analysis) >= 10:
+                    #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
+                    #andiamo a cancellare la più vecchia
+                    view_analysis = get_crono(cursor)
+                    if len(view_analysis) >= 10:
 
-                    oldest_analysis = view_analysis[-1] 
-                    oldest_id = oldest_analysis[0]
-                    oldest_temp_file_path = os.path.join(temp_files_dir, f"temp_{oldest_id}.pdf")
-                    delete_temp_file(oldest_temp_file_path)
-                    delete_oldest_analysis(conn, cursor)
-                    logging.info("Oldest analysis deleted to maintain history size limit.")
+                        oldest_analysis = view_analysis[-1] 
+                        oldest_id = oldest_analysis[0]
+                        oldest_temp_file_path = os.path.join(temp_files_dir, f"temp_{oldest_id}.pdf")
+                        delete_temp_file(oldest_temp_file_path)
+                        delete_oldest_analysis(conn, cursor)
+                        logging.info("Oldest analysis deleted to maintain history size limit.")
 
-                # rimuoviamo temporaneamente il blob dai dati estratti ed usiamo add_analysis_history per salvare 
-                # sia i dati estratti che il file come blob, per poi ripristinare il blob
-                file_blob = st.session_state['extracted_data'].pop("file_blob", None)
-                add_analysis_history(conn, cursor, st.session_state['uploaded_file_name'], st.session_state['extracted_data'], file_blob)
-                if file_blob: 
-                    st.session_state['extracted_data']["file_blob"] = file_blob
+                    # rimuoviamo temporaneamente il blob dai dati estratti ed usiamo add_analysis_history per salvare 
+                    # sia i dati estratti che il file come blob, per poi ripristinare il blob
+                    file_blob = st.session_state['extracted_data'].pop("file_blob", None)
+                    add_analysis_history(conn, cursor, st.session_state['uploaded_file_name'], st.session_state['extracted_data'], file_blob)
+                    if file_blob: 
+                        st.session_state['extracted_data']["file_blob"] = file_blob
+                else:
+                    logging.info("Skipping duplicate display for new analysis.")
             else:
                 st.error(current_lang["data_extraction_error"])
                 logging.error("Failed to extract data from the document.")
@@ -476,10 +483,13 @@ else:
 #andiamo a mostrare la cronologia delle analisi effettuate, in modo tale da poterle visualizzare
 #ed usando la query_params per mostrare i dati estratti in base all'get_analysis selezionata
     if "all_history" in st.session_state and st.session_state['extracted_data']:
-        st.header(current_lang["analysis_info"].format(st.session_state['uploaded_file_name']))
-        edit_data(st.session_state['extracted_data'], key_prefix="history_view", show_image_with_bbox=True)
+        if st.session_state['analysis_source'] != 'new':
+            st.header(current_lang["analysis_info"].format(st.session_state['uploaded_file_name']))
+            edit_data(st.session_state['extracted_data'], key_prefix="history_view", show_image_with_bbox=True)
 
     query_params = st.query_params
+
+    
     if "get_analysis" in query_params:
         id_get_analysis = int(query_params["get_analysis"][0])
         dati_get_analysis = get_data_analysis(id_get_analysis)
