@@ -59,6 +59,7 @@ translations = {
         "analyzing_document": "Analizzando il documento...",
         "ocr_error": "Errore durante l'OCR e la generazione del PDF: {error}",
         "rectangle_error": "Errore durante il disegno dei rettangoli: {error}",
+        "data_not_found": "I dati del file per questa analisi sono mancanti."
     },
     "EN": {
         "welcome_title": "Welcome to our powerful AI Data Extractor!",
@@ -89,6 +90,39 @@ translations = {
         "analyzing_document": "Analyzing the document...",
         "ocr_error": "Error during OCR and PDF generation: {error}",
         "rectangle_error": "Error during rectangle drawing: {error}",
+        "data_not_found": "File data for this analysis is missing."
+    },
+    "ES": {
+        "welcome_title": "¡Bienvenido a nuestro potente extractor de datos AI!",
+        "select_language": "Selecciona un idioma:",
+        "home": "Página principal",
+        "login_prompt": "Inicia sesión para continuar",
+        "login_button": "Iniciar sesión",
+        "analysis_history": "Historial de análisis",
+        "analysis_info": "Información de análisis",
+        "history_info" : "No hay análisis disponibles en el historial.",
+        "logout_button": "Cerrar sesión",
+        "greeting": "Hola, **{name}**, {email}",
+        "extract_data_title": "Extraer :blue[Datos] con :blue-background[Azure AI]",
+        "upload_label": "Cargar una factura o un recibo",
+        "success_upload": "Archivo {file_name} cargado con éxito",
+        "error_upload": "Error al analizar el documento: {error}",
+        "json_success": "Datos actualizados y archivo JSON descargado con éxito!",
+        "json_error": "Error al actualizar los datos y descargar: {error}",
+        "product_list": "Lista de productos",
+        "text_input": ["Nombre del vendedor", "Dirección del vendedor", "Número de teléfono del vendedor", "Fecha", "Hora", "Número de IVA", "Total"],
+        "dataframe_columns": ["Descripción", "Código de producto", "Cantidad", "Precio unitario", "Total"],
+        "update_download_button": "Actualizar y descargar datos",
+        "no_file_warning": "No se ha cargado ningún archivo, siga las instrucciones correctas",
+        "unsupported_file_error": "Tipo de archivo no compatible cargado: {file_name}",
+        "invalid_file_error": "Archivo {file_type} no válido cargado: {file_name}",
+        "data_extraction_error": "No se pudieron extraer datos del documento.",
+        "temp_path" : "La ruta del archivo temporal no está definida.",
+        "analyzing_document": "Analizando el documento...",
+        "ocr_error": "Error durante el OCR y la generación del PDF: {error}",
+        "rectangle_error": "Error al dibujar los rectángulos: {error}",
+        "data_not_found": "Los datos del archivo para este análisis faltan."
+
     }
 }
 
@@ -104,7 +138,7 @@ with st.sidebar:
         link="https://www.oaks.cloud/")
     st.title(f":blue-background[**{translations['IT']['home']}**]")
     st.header(f"**{translations['IT']['select_language']}**")
-    lang = st.selectbox("**Choose an option**", ["IT", "EN"])
+    lang = st.selectbox("**Choose an option**", ["IT", "EN", "ES"])
 # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
     current_lang = translations[lang]
 
@@ -178,7 +212,7 @@ else:
                         logging.info(f"Temporary file {temp_file_path} recreated successfully.")
                     else:
                         logging.warning("Blob data not found in the extracted data.")
-                        st.error("I dati del file per questa analisi sono mancanti.")
+                        st.error(current_lang["data_not_found"])
                 except Exception as e:
                     logging.error(f"Error recreating temporary file: {e}")
                     st.error(current_lang["rectangle_error"].format(error=e))
@@ -352,7 +386,7 @@ else:
                     st.image(img, width=500, caption="PDF con aree evidenziate")
 
                 except Exception as e:
-                    logging.error(f"Errore durante la generazione dell'immagine con bounding box: {e}")
+                    logging.error(f"Error during the generation of the image with bounding box: {e}")
                     st.error(current_lang["rectangle_error"].format(error=e))
 
             submit_button = st.form_submit_button(label=current_lang["update_download_button"])
