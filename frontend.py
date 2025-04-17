@@ -163,7 +163,8 @@ else:
             if "all_history" not in st.session_state or st.session_state["all_history"] != id_get_analysis:
                 st.session_state["all_history"] = id_get_analysis
                 st.session_state['extracted_data'] = get_data_analysis(cursor, id_get_analysis)
-                st.session_state['uploaded_file_name'] = selection.split(" - ")[0]
+                st.session_state['selected_analysis_name'] = selection.split(" - ")[0]
+
 
                 #qua andiamo a creare un file temporaneo per il blob salvato nel database
                 temp_file_path = os.path.join(temp_files_dir, f"temp_{id_get_analysis}.pdf")
@@ -376,8 +377,12 @@ else:
                 buff.write(json_string.encode('utf-8'))
                 buff.seek(0)
 
+                if st.session_state.get("analysis_source") == "history":
+                    file_name = f"{st.session_state.get('selected_analysis_name')}.json"
+                else:
+                    file_name = f"{st.session_state.get('uploaded_file_name')}.json"
                 components.html(
-                    download_button(buff.getvalue(), f"{st.session_state['uploaded_file_name']}.json"),
+                    download_button(buff.getvalue(), file_name),
                     height=0,
                 )
                 st.success(current_lang["json_success"])
@@ -425,7 +430,8 @@ else:
     if uploaded_file is not None:
         #inseriamo la variabile di sessione per l'uploaded_file in modo tale da
         #riavviare l'analisi in caso di cambio file caricato, resettando i dati estratti
-        if uploaded_file.name != st.session_state['uploaded_file_name']:
+        if uploaded_file.name != st.session_state.get('uploaded_file_name'):
+        
             st.session_state['extracted_data'] = None  
             st.session_state['uploaded_file_name'] = uploaded_file.name
             if st.session_state['temporary_file_path']:
