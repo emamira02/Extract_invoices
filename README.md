@@ -1,15 +1,18 @@
 # Estrattore di Dati con Azure AI
 
-Questo progetto fornisce un'applicazione Streamlit che estrae dati da fatture e ricevute utilizzando Azure AI Document Intelligence. Consente agli utenti di caricare documenti, analizzarli, modificare i dati estratti e scaricare i risultati in formato JSON. L'applicazione gestisce anche il login utente tramite Microsoft Azure Entra ID.
+Questo progetto fornisce un'applicazione Streamlit che estrae dati da fatture e ricevute utilizzando Azure AI Document Intelligence. Consente agli utenti di caricare documenti, analizzarli, modificare i dati estratti, visualizzare le aree evidenziate sull'immagine e scaricare i risultati in formato JSON. L'applicazione gestisce anche il login utente tramite Microsoft Azure Entra ID e memorizza la cronologia delle analisi.
 
 ## Funzionalità
 
 *   **Caricamento Documenti:** Supporta i formati di file PDF, JPG, JPEG e PNG.
 *   **Estrazione con Azure AI:** Utilizza Azure AI Document Intelligence per estrarre informazioni rilevanti da fatture e ricevute.
-*   **Modifica Dati:** Consente agli utenti di modificare i dati estratti in un'interfaccia intuitiva.
+*   **Modifica Dati:** Consente agli utenti di modificare i dati estratti tramite un'interfaccia interattiva.
 *   **Visualizzazione Dati:** Evidenzia i dati estratti sull'immagine del documento.
 *   **Download JSON:** Fornisce un pulsante di download per i dati estratti e modificati in formato JSON.
 *   **Autenticazione Utente:** Protegge l'accesso con il login di Microsoft Azure Entra ID tramite Streamlit's `st.experimental_user`.
+*   **Gestione della Cronologia:** Memorizza fino a 10 analisi nel database SQLite integrato, permettendo agli utenti di rivedere e scaricare analisi precedenti. Le analisi più vecchie vengono automaticamente eliminate per mantenere il limite.
+*   **Supporto Multilingue:** Interfaccia utente tradotta in Italiano, Inglese e Spagnolo.
+*   **Gestione File Temporanei:** I file caricati vengono salvati in una cartella temporanea (`temp_files`) e gestiti per ridurre l'uso di memoria.
 *   **Dockerizzato:** Facilmente implementabile con Docker.
 
 ## Prerequisiti
@@ -18,7 +21,7 @@ Questo progetto fornisce un'applicazione Streamlit che estrae dati da fatture e 
 *   **Azure AI Document Intelligence Resource:** Una risorsa Document Intelligence creata nella tua sottoscrizione Azure. Avrai bisogno della chiave API e dell'endpoint per questa risorsa.
 *   **Microsoft Azure Entra ID:** Un Microsoft Azure Entra ID per l'autenticazione utente. Devi registrare un'applicazione in Azure AD e ottenere il Client ID e il Client Secret.
 *   **Python 3.12:** Python 3.12 o superiore installato.
-*   **Docker:** Docker installato per la containerizzazione.
+*   **Docker:** Docker installato per la containerizzazione(opzionale).
 
 ## Configurazione
 
@@ -64,7 +67,7 @@ Questo progetto fornisce un'applicazione Streamlit che estrae dati da fatture e 
 
 4.  **Configura Tesseract OCR (Importante per una Migliore Qualità OCR):**
 
-    *   Sebbene l'applicazione utilizzi l'OCR Tesseract integrato in PyMuPDF, puoi migliorare significativamente la precisione dell'OCR installando Tesseract sulla tua macchina host e fornendo il percorso alla sua directory tessdata.
+    *   Anche se l'applicazione utilizza l'OCR Tesseract integrato in PyMuPDF, puoi migliorare significativamente la precisione dell'OCR installando Tesseract sulla tua macchina host e fornendo il percorso alla sua directory `tessdata`.
 
     *   **Installa Tesseract:** Segui le istruzioni di installazione per il tuo sistema operativo. I metodi comuni includono:
 
@@ -86,19 +89,22 @@ Questo progetto fornisce un'applicazione Streamlit che estrae dati da fatture e 
 
         Assicurati che il percorso sia corretto. Se non è impostato o è errato, l'OCR potrebbe non funzionare correttamente.
 
-5.  **Installare le dipendenze Python:**
+5.  **Installa le dipendenze Python:**
 
     ```bash
     pip install -r requirements.txt
     ```
 
-6.  **Crea l'immagine Docker (nella directory principale del progetto):**
+6. **Crea la directory `temp_files`:**
+    L'applicazione salva temporaneamente i file caricati nella directory `temp_files`. Assicurati che questa directory esista. Puoi crearla manualmente o l'applicazione la creerà al primo avvio.
+
+7.  **Crea l'immagine Docker (nella directory principale del progetto):**
 
     ```bash
     docker build -t data-extractor .
     ```
 
-7.  **Esegui il container Docker:**
+8.  **Esegui il container Docker:**
 
     ```bash
     docker-compose up -d
@@ -112,17 +118,21 @@ Questo progetto fornisce un'applicazione Streamlit che estrae dati da fatture e 
 4.  Attendi che l'applicazione analizzi il documento ed estragga i dati.
 5.  Visualizza e modifica i dati estratti nell'interfaccia utente.
 6.  Scarica i dati in formato JSON.
+7.  Esplora la cronologia delle analisi nel pannello laterale per rivedere e scaricare analisi precedenti.
 
 ## Note
 
 *   Per un corretto funzionamento del login di Microsoft, assicurati di aver configurato correttamente il file `.streamlit/secrets.toml` con il Client ID, Client Secret e Redirect URI corretti.
 *   L'accuratezza dell'estrazione dei dati dipende dalla qualità del documento di input e dalle capacità del modello Azure AI Document Intelligence.
 *   Se l'OCR non funziona correttamente, verifica che `TESSDATA_PREFIX` sia impostato correttamente e che i file di dati linguistici di Tesseract siano presenti nella directory specificata.
-* Il modello prebuilt-receipt nel backend, viene utilizzato per estrapolare solo il MerchantPhoneNumber e il TransactionTime, qualora siano presenti nel documento, poichè il modello prebuilt-invoice non li estrae.
+* Il modello prebuilt-receipt nel backend, viene utilizzato per estrapolare solo il `MerchantPhoneNumber` e il `TransactionTime`, qualora siano presenti nel documento, poichè il modello prebuilt-invoice non li estrae.
+*   L'applicazione memorizza un massimo di 10 analisi. Le analisi più vecchie vengono eliminate automaticamente per fare spazio a nuove.
 
 ## Risoluzione dei problemi
 
 *   **Errore di autenticazione:** Verifica che le impostazioni di Azure Active Directory siano configurate correttamente e che il file `secrets.toml` contenga il Client ID, Client Secret e Redirect URI corretti. Verifica anche che l'URL di reindirizzamento nell'applicazione Azure AD corrisponda a quello configurato in `secrets.toml`.
 *   **Errore di estrazione dei dati:** Verifica che la chiave API e l'endpoint di Azure AI Document Intelligence siano corretti nel file `client.ini` e che la risorsa sia attiva nella tua sottoscrizione Azure.
-*   **OCR non funzionante:** Verifica che la variabile d'ambiente `TESSDATA_PREFIX` sia impostata correttamente e che i file di dati linguistici di Tesseract siano presenti nella directory specificata.
-*   **Errore di download:** Verifica i log dell'applicazione per identificare eventuali errori durante la creazione del link di download.
+*   **OCR non funzionante:** Verifica che la variabile d'ambiente `TESSDATA_PREFIX` sia impostata correttamente e che i file di dati linguistici di Tesseract siano presenti nella directory specificata.  Assicurati che PyMuPDF sia configurato correttamente per utilizzare Tesseract.
+*   **Errore di download:** Verifica i log dell'applicazione per identificare eventuali errori durante la creazione del link di download. Controlla i permessi di scrittura se stai usando Docker.
+*   **Problemi con la visualizzazione dei dati evidenziati:** Assicurati che PyMuPDF e le sue dipendenze siano installate correttamente. Controlla i log per eventuali errori durante l'elaborazione dell'immagine.
+* **Cronologia non funzionante:** Verifica che il database SQLite (`cronologia.db`) sia creato correttamente e che l'applicazione abbia i permessi di scrittura necessari.
