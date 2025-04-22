@@ -1,0 +1,8 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./client.ini:/app/client.ini 
+      - ./.streamlit/secrets.toml:/app/.streamlit/secrets.toml

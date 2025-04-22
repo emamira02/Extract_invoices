@@ -1,0 +1,4 @@
+[DocumentAI]
+
+api_key = "YOUR-DOCUMENT-INTELLIGENCE-API-KEY"   # This is your Document Intelligence API key from Azure
+endpoint = "YOUR-DOCUMENT-INTELLIGENCE-ENDPOINT"    # e.g., https://your-endpoint-url
