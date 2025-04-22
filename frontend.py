@@ -31,9 +31,6 @@ st.set_page_config(
 # andiamo a definire le traduzioni in un dizionario, in modo tale da poterle usare in base alla lingua selezionata
 translations = {
     "IT": {
-        "welcome_title": "Benvenuto nel nostro potente Estrattore AI di Dati!",
-        "select_language": "Seleziona una lingua:",
-        "home": "Homepage",
         "login_prompt": "Effettua il login per continuare",
         "login_button": "Log in",
         "analysis_history": "Cronologia Analisi",
@@ -62,9 +59,6 @@ translations = {
         "data_not_found": "I dati del file per questa analisi sono mancanti."
     },
     "EN": {
-        "welcome_title": "Welcome to our powerful AI Data Extractor!",
-        "select_language": "Select a language:",
-        "home": "Homepage",
         "login_prompt": "Please log in to continue",
         "login_button": "Log in",
         "analysis_history": "Analysis History",
@@ -93,9 +87,6 @@ translations = {
         "data_not_found": "File data for this analysis is missing."
     },
     "ES": {
-        "welcome_title": "¡Bienvenido a nuestro potente extractor de datos AI!",
-        "select_language": "Selecciona un idioma:",
-        "home": "Página principal",
         "login_prompt": "Inicia sesión para continuar",
         "login_button": "Iniciar sesión",
         "analysis_history": "Historial de análisis",
@@ -136,13 +127,11 @@ with st.sidebar:
     st.logo("https://www.oaks.cloud/_next/static/media/oaks.1ea4e367.svg",    #inseriamo il logo dell'azienda nella nostra app
         size="large",
         link="https://www.oaks.cloud/")
-    st.title(f":blue-background[**{translations['IT']['home']}**]")
-    st.header(f"**{translations['EN']['select_language']}**")
-    lang = st.selectbox("**Choose an option**", ["IT", "EN", "ES"])
+    st.title(f":blue-background[:house:**This is the Homepage**]")
+st.title(f":blue-background[**Welcome to our powerful AI Data Extractor!**]")
+lang = st.selectbox("**Choose an option**", ["IT", "EN", "ES"])
 # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
-    current_lang = translations[lang]
-
-st.title(f":blue-background[**{current_lang['welcome_title']}**]")
+current_lang = translations[lang]
 
 # andiamo a configurare i nostri log, creando un file a parte per visualizzarli
 logging.basicConfig(
@@ -177,48 +166,56 @@ else:
         st.markdown(f"# {current_lang['extract_data_title']}")
 
     with st.sidebar:
-    #andiamo a mostrare la cronologia delle analisi effettuate mediante un selectbox, se non è vuota
+    #andiamo a mostrare la cronologia delle analisi effettuate mediante vari bottoni, se non è vuota
     #allora mostriamo la cronologia, altrimenti mostriamo un messaggio di errore
         view_analysis = get_crono(cursor)
         view_analysis_names = [f"{get_analysis[1]} - {get_analysis[2]}" for get_analysis in view_analysis]
-        selection = st.selectbox(current_lang["analysis_history"], view_analysis_names, key="history_sidebar")
+        st.header(f":bookmark_tabs: **{current_lang['analysis_history']}**")
+
+        if 'history_selection' not in st.session_state:
+            st.session_state.history_selection = None
 
         #quando l'utente seleziona un'analisi dalla cronologia, recupera il blob salvato nel database
         #e lo salva in un file temporaneo, in modo tale da poterlo usare.
-        if selection:
-            id_get_analysis = view_analysis[view_analysis_names.index(selection)][0]
+        for i, analysis_item in enumerate(view_analysis_names):
+            if st.button(analysis_item, key=f"history_btn_{i}"):
             #andiamo a creare una chiave di sessione per la cronologia, in modo tale da non sovrascrivere
             #le analisi precedenti, e andiamo a verificare se la chiave è presente nella sessione
-            history_session_key = f"history_{id_get_analysis}"
+                st.session_state.history_selection = analysis_item
+                
+                id_get_analysis = view_analysis[i][0]
+                history_session_key = f"history_{id_get_analysis}"
+                
+                if history_session_key not in st.session_state:
+                    st.session_state[history_session_key] = {}
+                
+                if "all_history" not in st.session_state or st.session_state["all_history"] != id_get_analysis:
+                    st.session_state["all_history"] = id_get_analysis
+                    st.session_state['extracted_data'] = get_data_analysis(cursor, id_get_analysis)
+                    st.session_state['selected_analysis_name'] = analysis_item
+                    
+                   #qua andiamo a creare un file temporaneo per il blob salvato nel database
+                    temp_file_path = os.path.join(temp_files_dir, f"temp_{id_get_analysis}.pdf")
+                    st.session_state[history_session_key]['temporary_file_path'] = temp_file_path
 
-            if history_session_key not in st.session_state:
-                st.session_state[history_session_key] = {}
-            
-            if "all_history" not in st.session_state or st.session_state["all_history"] != id_get_analysis:
-                st.session_state["all_history"] = id_get_analysis
-                st.session_state['extracted_data'] = get_data_analysis(cursor, id_get_analysis)
-                st.session_state['selected_analysis_name'] = selection.split(" - ")[0]
+                    try:
+                        blob_data = st.session_state['extracted_data'].get("file_blob")
+                        if blob_data:
+                            with open(temp_file_path, "wb") as temp_file:
+                                temp_file.write(blob_data)
+                            logging.info(f"Temporary file {temp_file_path} recreated successfully.")
+                        else:
+                            logging.warning("Blob data not found in the extracted data.")
+                            st.error(current_lang["data_not_found"])
+                    except Exception as e:
+                        logging.error(f"Error recreating temporary file: {e}")
+                        st.error(current_lang["rectangle_error"].format(error=e))
 
+                    st.session_state['analysis_source'] = 'history'
+                    st.rerun()
 
-                #qua andiamo a creare un file temporaneo per il blob salvato nel database
-                temp_file_path = os.path.join(temp_files_dir, f"temp_{id_get_analysis}.pdf")
-                st.session_state[history_session_key]['temporary_file_path'] = temp_file_path
-
-                try:
-                    blob_data = st.session_state['extracted_data'].get("file_blob")
-                    if blob_data:
-                        with open(temp_file_path, "wb") as temp_file:
-                            temp_file.write(blob_data)
-                        logging.info(f"Temporary file {temp_file_path} recreated successfully.")
-                    else:
-                        logging.warning("Blob data not found in the extracted data.")
-                        st.error(current_lang["data_not_found"])
-                except Exception as e:
-                    logging.error(f"Error recreating temporary file: {e}")
-                    st.error(current_lang["rectangle_error"].format(error=e))
-
-                st.session_state['analysis_source'] = 'history'
-                st.rerun()
+        if st.session_state.history_selection:
+            st.info(f"Selezionato: {st.session_state.history_selection}")
 
 #la funzione per gestire il file che viene caricato, se non è vuota allora il file
 #viene letto, andando a verificare però che il file sia un file pdf, ed in caso creando
