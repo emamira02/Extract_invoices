@@ -137,7 +137,7 @@ with st.sidebar:
         size="large",
         link="https://www.oaks.cloud/")
     st.title(f":blue-background[**{translations['IT']['home']}**]")
-    st.header(f"**{translations['IT']['select_language']}**")
+    st.header(f"**{translations['EN']['select_language']}**")
     lang = st.selectbox("**Choose an option**", ["IT", "EN", "ES"])
 # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
     current_lang = translations[lang]
@@ -415,10 +415,12 @@ else:
                     file_name = f"{st.session_state.get('selected_analysis_name')}.json"
                 else:
                     file_name = f"{st.session_state.get('uploaded_file_name')}.json"
+                download_html = download_button(buff.getvalue(), file_name) 
                 components.html(
-                    download_button(buff.getvalue(), file_name),
+                    download_html,
                     height=0,
                 )
+                st.rerun()
                 st.success(current_lang["json_success"])
                 logging.info(f"JSON file {st.session_state['uploaded_file_name']}.json downloaded successfully.")
 
