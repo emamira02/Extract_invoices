@@ -390,6 +390,9 @@ else:
                     st.error(current_lang["rectangle_error"].format(error=e))
 
             submit_button = st.form_submit_button(label=current_lang["update_download_button"])
+            if st.session_state.get('download_success'):
+                st.success(current_lang["json_success"])
+            del st.session_state['download_success']
 
         if submit_button:
             json_data_italiano = {
@@ -420,9 +423,9 @@ else:
                     download_html,
                     height=0,
                 )
-                st.rerun()
-                st.success(current_lang["json_success"])
                 logging.info(f"JSON file {st.session_state['uploaded_file_name']}.json downloaded successfully.")
+                st.session_state['download_success'] = True
+                st.rerun()
 
             except Exception as e:
                 logging.error(f"Error during the data update and download: {e}")
@@ -459,6 +462,8 @@ else:
         st.session_state['temporary_file_path'] = None
     if 'analysis_source' not in st.session_state:
         st.session_state['analysis_source'] = None
+    if 'download_success' not in st.session_state:
+        st.session_state['download_success'] = False
 
 #se il file è stato caricato con successo , gestiamo l'upload con la nostra funzione
 #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto restituendo
@@ -512,6 +517,7 @@ else:
                             
                         logging.info("Document analysis completed successfully.")
                         st.session_state['analysis_source'] = 'new'
+                        st.rerun()
                     except Exception as e:
                         logging.error(f"Error during document analysis: {e}")
                         st.error(current_lang["error_upload"].format(error=e))
