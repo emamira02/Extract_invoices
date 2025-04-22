@@ -503,9 +503,6 @@ else:
             #recuperare in un secondo momento, e mostrare la cronologia delle analisi
             if st.session_state['extracted_data']:
                 if st.session_state['analysis_source'] == 'new':
-                    st.header(current_lang["product_list"])
-                    edit_data(st.session_state['extracted_data'], key_prefix="new_upload")
-
                     #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
                     #andiamo a cancellare la più vecchia
                     view_analysis = get_crono(cursor)
@@ -524,6 +521,10 @@ else:
                     add_analysis_history(conn, cursor, st.session_state['uploaded_file_name'], st.session_state['extracted_data'], file_blob)
                     if file_blob: 
                         st.session_state['extracted_data']["file_blob"] = file_blob
+
+                    st.header(current_lang["product_list"])
+                    edit_data(st.session_state['extracted_data'], key_prefix="new_upload")
+
                 else:
                     logging.info("Skipping duplicate display for new analysis.")
             else:
