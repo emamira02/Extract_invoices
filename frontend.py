@@ -133,7 +133,7 @@ conn = sqlite3.connect('cronologia.db')
 cursor = conn.cursor()
 
 with st.sidebar:
-    st.logo("https://www.oaks.cloud/_next/static/media/oaks.13e2f970.svg",    #inseriamo il logo dell'azienda nella nostra app
+    st.logo("https://www.oaks.cloud/_next/static/media/oaks.1ea4e367.svg",    #inseriamo il logo dell'azienda nella nostra app
         size="large",
         link="https://www.oaks.cloud/")
     st.title(f":blue-background[**{translations['IT']['home']}**]")
