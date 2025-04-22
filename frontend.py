@@ -491,6 +491,25 @@ else:
                             file_content = f.read()
                             st.session_state['extracted_data'] = analyze_invoice(file_content)
                             st.session_state['extracted_data']["file_blob"] = file_content
+                        
+                    #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
+                    #andiamo a cancellare la più vecchia
+                        view_analysis = get_crono(cursor)
+                        if len(view_analysis) >= 10:
+                            oldest_analysis = view_analysis[-1] 
+                            oldest_id = oldest_analysis[0]
+                            oldest_temp_file_path = os.path.join(temp_files_dir, f"temp_{oldest_id}.pdf")
+                            delete_temp_file(oldest_temp_file_path)
+                            delete_oldest_analysis(conn, cursor)
+                            logging.info("Oldest analysis deleted to maintain history size limit.")
+
+                    # rimuoviamo temporaneamente il blob dai dati estratti ed usiamo add_analysis_history per salvare 
+                    # sia i dati estratti che il file come blob, per poi ripristinare il blob
+                        file_blob = st.session_state['extracted_data'].pop("file_blob", None)
+                        add_analysis_history(conn, cursor, st.session_state['uploaded_file_name'], st.session_state['extracted_data'], file_blob)
+                        if file_blob: 
+                            st.session_state['extracted_data']["file_blob"] = file_blob
+                            
                         logging.info("Document analysis completed successfully.")
                         st.session_state['analysis_source'] = 'new'
                     except Exception as e:
@@ -505,25 +524,6 @@ else:
             #recuperare in un secondo momento, e mostrare la cronologia delle analisi
             if st.session_state['extracted_data']:
                 if st.session_state['analysis_source'] == 'new':
-                    #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
-                    #andiamo a cancellare la più vecchia
-                    view_analysis = get_crono(cursor)
-                    if len(view_analysis) >= 10:
-
-                        oldest_analysis = view_analysis[-1] 
-                        oldest_id = oldest_analysis[0]
-                        oldest_temp_file_path = os.path.join(temp_files_dir, f"temp_{oldest_id}.pdf")
-                        delete_temp_file(oldest_temp_file_path)
-                        delete_oldest_analysis(conn, cursor)
-                        logging.info("Oldest analysis deleted to maintain history size limit.")
-
-                    # rimuoviamo temporaneamente il blob dai dati estratti ed usiamo add_analysis_history per salvare 
-                    # sia i dati estratti che il file come blob, per poi ripristinare il blob
-                    file_blob = st.session_state['extracted_data'].pop("file_blob", None)
-                    add_analysis_history(conn, cursor, st.session_state['uploaded_file_name'], st.session_state['extracted_data'], file_blob)
-                    if file_blob: 
-                        st.session_state['extracted_data']["file_blob"] = file_blob
-
                     st.header(current_lang["product_list"])
                     edit_data(st.session_state['extracted_data'], key_prefix="new_upload")
 
