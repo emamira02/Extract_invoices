@@ -1,0 +1,11 @@
+streamlit
+azure-ai-documentintelligence
+azure-core
+configparser
+pandas
+pillow
+authlib
+pymupdf
+dotenv
+fuzzywuzzy
+python-Levenshtein
