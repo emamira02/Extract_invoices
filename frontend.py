@@ -34,20 +34,22 @@ translations = {
         "login_prompt": "Effettua il login per continuare",
         "login_button": "Log in",
         "analysis_history": "Cronologia Analisi",
-        "analysis_info": "Informazioni sull'analisi",
+        "analysis_info": "Informazioni sui prodotti",
+        "info_textinput": "Informazioni sul Venditore",
         "history_info" : "Non è disponibile alcuna analisi in cronologia.",
         "logout_button": "Log out",
         "greeting": "Ciao, **{name}**, {email}",
         "extract_data_title": "Estrai :blue[Data] con :blue-background[Azure AI]",
         "upload_label": "Carica una Fattura o una Ricevuta",
         "success_upload": "File {file_name} caricato con successo",
+        "extract_image": "Immagine con bounding box",
         "error_upload": "Errore durante l'analisi del documento: {error}",
         "json_success": "Dati aggiornati e file JSON scaricato con successo!",
         "json_error": "Errore durante l'aggiornamento dei dati e il download: {error}",
-        "product_list": "Lista di Prodotti",
         "text_input": ["Nome Venditore","Indirizzo Venditore","Numero di telefono Venditore","Data","Orario","PIVA","Totale"],
         "dataframe_columns": ["Descrizione", "Codice Prodotto", "Quantità", "PrezzoUnità", "Totale"],
         "update_download_button": "Aggiorna e Scarica Dati",
+        "analyze_selected": "Analisi selezionata:",
         "no_file_warning": "Non è stato caricato alcun file, seguire le istruzioni corrette",
         "unsupported_file_error": "Tipo di file non supportato caricato: {file_name}",
         "invalid_file_error": "File {file_type} non valido caricato: {file_name}",
@@ -62,20 +64,22 @@ translations = {
         "login_prompt": "Please log in to continue",
         "login_button": "Log in",
         "analysis_history": "Analysis History",
-        "analysis_info": "Analysis Information",
+        "analysis_info": "Product Information",
+        "info_textinput": "Vendor Information",
         "history_info" : "No analysis history available.",
         "logout_button": "Log out",
         "greeting": "Hello, **{name}**, {email}",
         "extract_data_title": "Extract :blue[Data] with :blue-background[Azure AI]",
         "upload_label": "Upload an Invoice or a Receipt",
         "success_upload": "File {file_name} uploaded successfully",
+        "extract_image": "Image with bounding box",
         "error_upload": "Error during document analysis: {error}",
         "json_success": "Data updated and JSON file downloaded successfully!",
         "json_error": "Error during the data update and download: {error}",
-        "product_list": "Product List",
         "text_input": ["Vendor Name", "Vendor Address", "Vendor Phone Number", "Date", "Time", "VAT Number", "Total"],
         "dataframe_columns": ["Description", "Product Code", "Quantity", "Unit Price", "Total"],
         "update_download_button": "Update and Download Data",
+        "analyze_selected": "Analyze selected:",
         "no_file_warning": "There's no file uploaded, please follow the right instructions",
         "unsupported_file_error": "Unsupported file type uploaded: {file_name}",
         "invalid_file_error": "Invalid {file_type} file uploaded: {file_name}",
@@ -90,20 +94,22 @@ translations = {
         "login_prompt": "Inicia sesión para continuar",
         "login_button": "Iniciar sesión",
         "analysis_history": "Historial de análisis",
-        "analysis_info": "Información de análisis",
+        "analysis_info": "Información sobre los productos",
+        "info_textinput": "Informaciòn del Vendedor",
         "history_info" : "No hay análisis disponibles en el historial.",
         "logout_button": "Cerrar sesión",
         "greeting": "Hola, **{name}**, {email}",
         "extract_data_title": "Extraer :blue[Datos] con :blue-background[Azure AI]",
         "upload_label": "Cargar una factura o un recibo",
         "success_upload": "Archivo {file_name} cargado con éxito",
+        "extract_image": "Imagen con bounding box",
         "error_upload": "Error al analizar el documento: {error}",
         "json_success": "Datos actualizados y archivo JSON descargado con éxito!",
         "json_error": "Error al actualizar los datos y descargar: {error}",
-        "product_list": "Lista de productos",
         "text_input": ["Nombre del vendedor", "Dirección del vendedor", "Número de teléfono del vendedor", "Fecha", "Hora", "Número de IVA", "Total"],
         "dataframe_columns": ["Descripción", "Código de producto", "Cantidad", "Precio unitario", "Total"],
         "update_download_button": "Actualizar y descargar datos",
+        "analyze_selected": "Análisis seleccionado:",
         "no_file_warning": "No se ha cargado ningún archivo, siga las instrucciones correctas",
         "unsupported_file_error": "Tipo de archivo no compatible cargado: {file_name}",
         "invalid_file_error": "Archivo {file_type} no válido cargado: {file_name}",
@@ -215,7 +221,7 @@ else:
                     st.rerun()
 
         if st.session_state.history_selection:
-            st.info(f"Selezionato: {st.session_state.history_selection}")
+            st.info(f"{current_lang['analyze_selected']}: {st.session_state.history_selection}")
 
 #la funzione per gestire il file che viene caricato, se non è vuota allora il file
 #viene letto, andando a verificare però che il file sia un file pdf, ed in caso creando
@@ -300,6 +306,7 @@ else:
 
         #creiamo un form per poter modificare i dati in italiano, con i parametri che andremo ad aggiornare
         with st.form(key=f"{key_prefix}_edit_form"):
+            st.header(current_lang["info_textinput"])
             data_it["Nome Venditore"] = st.text_input(current_lang["text_input"][0], value=data.get("VendorName", "N/A"), key=f"{key_prefix}_vendor_name")
             data_it["Indirizzo Venditore"] = st.text_input(current_lang["text_input"][1], value=data.get("VendorAddress", "N/A"), key=f"{key_prefix}_vendor_address")
             data_it["Numero di telefono Venditore"] = st.text_input(current_lang["text_input"][2], value=data.get("MerchantPhoneNumber", "N/A"), key=f"{key_prefix}_vendor_phone")
@@ -380,16 +387,14 @@ else:
 
                 # qua mostriamo l'immagine con le aree evidenziate e width predefinita, e creiamo un bottone per il download
                 # del file json e per aggiornare i dati, con un messaggio di successo o errore
-                    st.image(img, width=500, caption="PDF con aree evidenziate")
+                    st.header(current_lang["extract_image"])
+                    st.image(img, width=500)
 
                 except Exception as e:
                     logging.error(f"Error during the generation of the image with bounding box: {e}")
                     st.error(current_lang["rectangle_error"].format(error=e))
 
             submit_button = st.form_submit_button(label=current_lang["update_download_button"])
-            if st.session_state.get('download_success'):
-                st.success(current_lang["json_success"])
-            del st.session_state['download_success']
 
         if submit_button:
             json_data_italiano = {
@@ -421,7 +426,7 @@ else:
                     height=0,
                 )
                 logging.info(f"JSON file {st.session_state['uploaded_file_name']}.json downloaded successfully.")
-                st.session_state['download_success'] = True
+                st.success(current_lang["json_success"])
                 st.rerun()
 
             except Exception as e:
@@ -459,8 +464,6 @@ else:
         st.session_state['temporary_file_path'] = None
     if 'analysis_source' not in st.session_state:
         st.session_state['analysis_source'] = None
-    if 'download_success' not in st.session_state:
-        st.session_state['download_success'] = False
 
 #se il file è stato caricato con successo , gestiamo l'upload con la nostra funzione
 #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto restituendo
@@ -527,7 +530,7 @@ else:
             #recuperare in un secondo momento, e mostrare la cronologia delle analisi
             if st.session_state['extracted_data']:
                 if st.session_state['analysis_source'] == 'new':
-                    st.header(current_lang["product_list"])
+                    st.header(current_lang["analysis_info"])
                     edit_data(st.session_state['extracted_data'], key_prefix="new_upload")
 
                 else:
