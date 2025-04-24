@@ -39,7 +39,6 @@ translations = {
         "history_info" : "Non è disponibile alcuna analisi in cronologia.",
         "logout_button": "Log out",
         "greeting": "Ciao, **{name}**, {email}",
-        "extract_data_title": "Estrai :blue[Data] con :blue-background[Azure AI]",
         "upload_label": "Carica una Fattura o una Ricevuta",
         "success_upload": "File {file_name} caricato con successo",
         "extract_image": "Immagine con bounding box",
@@ -69,7 +68,6 @@ translations = {
         "history_info" : "No analysis history available.",
         "logout_button": "Log out",
         "greeting": "Hello, **{name}**, {email}",
-        "extract_data_title": "Extract :blue[Data] with :blue-background[Azure AI]",
         "upload_label": "Upload an Invoice or a Receipt",
         "success_upload": "File {file_name} uploaded successfully",
         "extract_image": "Image with bounding box",
@@ -99,7 +97,6 @@ translations = {
         "history_info" : "No hay análisis disponibles en el historial.",
         "logout_button": "Cerrar sesión",
         "greeting": "Hola, **{name}**, {email}",
-        "extract_data_title": "Extraer :blue[Datos] con :blue-background[Azure AI]",
         "upload_label": "Cargar una factura o un recibo",
         "success_upload": "Archivo {file_name} cargado con éxito",
         "extract_image": "Imagen con bounding box",
@@ -134,7 +131,7 @@ with st.sidebar:
         size="large",
         link="https://www.oaks.cloud/")
     st.title(f":blue-background[:house:**This is the Homepage**]")
-st.title(f":blue-background[**Welcome to our powerful AI Data Extractor!**]")
+st.title(f":blue-background[**Welcome to our powerful :blue[Azure AI] Data Extractor!**]")
 lang = st.selectbox("**Choose an option**", ["IT", "EN", "ES"])
 # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
 current_lang = translations[lang]
@@ -167,9 +164,6 @@ else:
     if st.experimental_user.is_logged_in:
         st.markdown(current_lang["greeting"].format(name=st.experimental_user.name, email=st.experimental_user.email))
         logging.info(f"User {st.experimental_user.name} ({st.experimental_user.email}) successfully logged in.")
-
-    # il titolo della nostra app con qualche edit estetico
-        st.markdown(f"# {current_lang['extract_data_title']}")
 
     with st.sidebar:
     #andiamo a mostrare la cronologia delle analisi effettuate mediante vari bottoni, se non è vuota
@@ -426,13 +420,12 @@ else:
                     height=0,
                 )
                 logging.info(f"JSON file {st.session_state['uploaded_file_name']}.json downloaded successfully.")
-                st.success(current_lang["json_success"])
                 st.rerun()
 
             except Exception as e:
                 logging.error(f"Error during the data update and download: {e}")
                 st.error(current_lang["json_error"].format(error=e))
-
+            st.success(current_lang["json_success"])
         return data_it
 
 #andiamo a definire una funzione per eliminare il file temporaneo, in modo tale da non sovraccaricare il database
@@ -448,10 +441,12 @@ else:
             logging.error(f"Error deleting temporary file {file_path}: {e}")
 
     #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
+    st.markdown(f"### :receipt: {current_lang['upload_label']}<div style='margin-bottom: -70px;'></div>", unsafe_allow_html=True)
     uploaded_file = st.file_uploader(
         label=current_lang["upload_label"], 
         type=["pdf", "jpg","png", "jpeg"],
-        key="file_uploader"
+        key="file_uploader",
+        label_visibility="hidden",
         )
     logging.info("Waiting for the file upload")
 
