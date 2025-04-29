@@ -35,6 +35,9 @@ translations = {
         "login_button": "Log in",
         "analysis_history": "Cronologia Analisi",
         "analysis_info": "Informazioni sui prodotti",
+        "first_title": ":blue-background[Benvenuto nel nostro potente :blue[Azure AI] Data Extractor!]",
+        "second_title": "Analizza i tuoi documenti e lascia che il nostro AI faccia il resto 🚀",
+        "third_title": "In seguito potrai modificare i dati estratti, visualizzare il file caricato con i campi evidenziati e scaricare il file in formato JSON. ⬇️",
         "info_textinput": "Informazioni sul Venditore",
         "history_info" : "Non è disponibile alcuna analisi in cronologia.",
         "logout_button": "Log out",
@@ -64,6 +67,9 @@ translations = {
         "login_button": "Log in",
         "analysis_history": "Analysis History",
         "analysis_info": "Product Information",
+        "first_title": ":blue-background[Welcome to our powerful :blue[Azure AI] Data Extractor!]",
+        "second_title": "Analyze your documents and let our AI do the rest 🚀",
+        "third_title": "Then you can edit the extracted data, view the uploaded file with highlighted fields, and download the file in JSON format. ⬇️",
         "info_textinput": "Vendor Information",
         "history_info" : "No analysis history available.",
         "logout_button": "Log out",
@@ -93,6 +99,9 @@ translations = {
         "login_button": "Iniciar sesión",
         "analysis_history": "Historial de análisis",
         "analysis_info": "Información sobre los productos",
+        "first_title": ":blue-background[Bienvenido a nuestro potente :blue[Azure AI] Data Extractor!]",
+        "second_title": "Analiza tus documentos y deja que nuestra IA haga el resto 🚀",
+        "third_title": "Luego podrás editar los datos extraídos, ver el archivo cargado con los campos resaltados y descargar el archivo en formato JSON.⬇️",
         "info_textinput": "Informaciòn del Vendedor",
         "history_info" : "No hay análisis disponibles en el historial.",
         "logout_button": "Cerrar sesión",
@@ -127,14 +136,21 @@ conn = sqlite3.connect('cronologia.db')
 cursor = conn.cursor()
 
 with st.sidebar:
-    st.logo("https://www.oaks.cloud/_next/static/media/oaks.1ea4e367.svg",    #inseriamo il logo dell'azienda nella nostra app
-        size="large",
-        link="https://www.oaks.cloud/")
-    st.title(f":blue-background[:house:**This is the Homepage**]")
-st.title(f":blue-background[**Welcome to our powerful :blue[Azure AI] Data Extractor!**]")
-lang = st.selectbox("**Choose an option**", ["IT", "EN", "ES"])
-# selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
-current_lang = translations[lang]
+    # Creiamo due colonne nel sidebar per allineare Logo+Titolo e Selectbox
+    col1, col2 = st.columns(2, vertical_alignment="top")
+    with st.form(key="login_form"):
+        with col1:
+            st.logo("https://www.oaks.cloud/_next/static/media/oaks.1ea4e367.svg",    #inseriamo il logo dell'azienda nella nostra app
+                size="large",
+                link="https://www.oaks.cloud/")
+            ""
+            st.title(f":house:**Homepage**")
+    with st.form(key="language_form"):
+        with col2:
+            lang = st.selectbox("A", ["IT", "EN", "ES"], label_visibility="hidden")
+            # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
+            current_lang = translations[lang]
+            st.session_state.translations = translations
 
 # andiamo a configurare i nostri log, creando un file a parte per visualizzarli
 logging.basicConfig(
@@ -158,15 +174,16 @@ if not st.experimental_user.is_logged_in:
         st.login()
 
 else:
-    if st.button(current_lang["logout_button"]):
-        st.logout()
-
-    if st.experimental_user.is_logged_in:
-        st.markdown(current_lang["greeting"].format(name=st.experimental_user.name, email=st.experimental_user.email))
-        logging.info(f"User {st.experimental_user.name} ({st.experimental_user.email}) successfully logged in.")
-
     with st.sidebar:
-    #andiamo a mostrare la cronologia delle analisi effettuate mediante vari bottoni, se non è vuota
+        if st.experimental_user.is_logged_in:
+            st.markdown(current_lang["greeting"].format(name=st.experimental_user.name, email=st.experimental_user.email))
+            logging.info(f"User {st.experimental_user.name} ({st.experimental_user.email}) successfully logged in.")
+
+        if st.button(current_lang["logout_button"]):
+            st.logout()
+            
+            
+            """#andiamo a mostrare la cronologia delle analisi effettuate mediante vari bottoni, se non è vuota
     #allora mostriamo la cronologia, altrimenti mostriamo un messaggio di errore
         view_analysis = get_crono(cursor)
         view_analysis_names = [f"{get_analysis[1]} - {get_analysis[2]}" for get_analysis in view_analysis]
@@ -215,7 +232,7 @@ else:
                     st.rerun()
 
         if st.session_state.history_selection:
-            st.info(f"{current_lang['analyze_selected']}: {st.session_state.history_selection}")
+            st.info(f"Selezionato: {st.session_state.history_selection}")"""
 
 #la funzione per gestire il file che viene caricato, se non è vuota allora il file
 #viene letto, andando a verificare però che il file sia un file pdf, ed in caso creando
@@ -439,6 +456,11 @@ else:
                 logging.warning(f"Temporary file {file_path} does not exist.")
         except Exception as e:
             logging.error(f"Error deleting temporary file {file_path}: {e}")
+
+    st.markdown(f"<h1 style='text-align: center;'>{current_lang['first_title'].replace(':blue[Azure AI]', '<span style="color:blue;">Azure AI</span>').replace(':blue-background[', '<span style="background-color:#b3d7fe;">').replace(']', '</span>')}</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align: center; font-weight: bold;'>{current_lang['second_title']}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h5 style='text-align: center;'>{current_lang['third_title']}</h3>", unsafe_allow_html=True)
+    st.markdown("---")
 
     #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
     st.markdown(f"### :receipt: {current_lang['upload_label']}<div style='margin-bottom: -70px;'></div>", unsafe_allow_html=True)
