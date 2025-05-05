@@ -3,7 +3,7 @@ import os
 import datetime
 import pandas as pd
 import logging
-from database import get_crono, get_data_analysis
+from database import get_crono, get_data_analysis, clear_db_history
 from frontend import translations, edit_data, delete_temp_file
 
 with st.sidebar:
@@ -45,16 +45,45 @@ else:
         if st.button(current_lang["logout_button"], key="history_logout_btn"):
             st.logout()
 
-    # Use the temporary directory from the main page
+    #usiamo la temp_files_dir present nel session_state per salvare i file temporanei
     if 'temp_files_dir' in st.session_state:
         temp_files_dir = st.session_state.temp_files_dir
     else:
         temp_files_dir = "temp_files"
         os.makedirs(temp_files_dir, exist_ok=True)
 
+    col1,col3 = st.columns([3,1])
+    with col1:
+        st.title(f"📋 {current_lang.get('analysis_history', 'Analysis History')}")
+    with col3:
+        ""
+        ""
+        #usiamo il decoratore @st.dialog per creare un popup che ci permetta di visualizzare il messaggio di avviso
+        #e di confermare l'azione di cancellazione della cronologia
+        @st.dialog(title=current_lang.get("clear_history_title", "Clear History"))
+        #definiamo una funzione per confermare la cancellazione della cronologia, mediante un pulsante cancelliamo l'intera cronologia presente
+        #nel database, chiedendo conferma all'utente prima di procedere
+        #e mostrando un messaggio di successo o errore a seconda dell'esito dell'operazione
+        def confirm_clear_history():
+            st.warning(current_lang.get("clear_warning", "Are you sure? This action cannot be undone."))
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(current_lang.get("confirm", "Yes, Clear History"), key="confirm_clear"):
+                    try:
+                        with st.spinner(current_lang.get("clearing", "Clearing history...")):
+                            for file in os.listdir(temp_files_dir):
+                                os.remove(os.path.join(temp_files_dir, file))
+                                clear_db_history()
+                                st.success(current_lang.get("clear_success", "History cleared successfully!"))
+                                st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+                with col2:
+                    if st.button(current_lang.get("cancel", "Cancel"), key="cancel_clear"):
+                        st.rerun()
 
-    st.title(f"📋 {current_lang.get('analysis_history', 'Analysis History')}")
-    st.divider()
+        if st.button(current_lang.get("clear_history", "🗑️ Clear All History")):
+            confirm_clear_history()
 
     #andiamo a prendere i dati dal nostro database SQLite
     #e a creare una lista con le informazioni delle analisi effettuate 

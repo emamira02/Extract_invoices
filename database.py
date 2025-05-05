@@ -100,6 +100,20 @@ def delete_oldest_analysis():
     finally:
         conn.close()
 
+#andiamo a definire una funzione per eliminare tutte le analisi presente nel db, in modo da poterlo ripulire
+def clear_db_history():
+    """Clears the entire analyze table."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM analyze")
+        conn.commit()
+        logging.info("Cleared all entries from the analyze table.")
+    except sqlite3.Error as e:
+        logging.error(f"Error clearing analyze table: {e}")
+    finally:
+        conn.close()
+
 #qua andiamo a definire la funzione per inserire i blob nel database SQLite
 #inserendo il nome del file e il percorso del file blob
 def insert_blob_data(nome_file, file_path):
