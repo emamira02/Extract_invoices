@@ -1,38 +1,30 @@
 import streamlit as st
 import os
-from database import get_crono, get_data_analysis
-import sqlite3
 import datetime
 import pandas as pd
 import logging
+from database import get_crono, get_data_analysis
 from frontend import translations, edit_data, delete_temp_file
-
-#andiamo a connettere il nostro database SQLite
-#e a creare un cursore per eseguire le query
-conn = sqlite3.connect('cronologia.db')
-cursor = conn.cursor()
 
 with st.sidebar:
     # Creiamo due colonne nel sidebar per allineare Logo+Titolo e Selectbox
     col1, col2 = st.columns(2, vertical_alignment="top")
-    with st.form(key="history_login_form"):
-        with col1:
-            st.logo("https://www.oaks.cloud/_next/static/media/oaks.1ea4e367.svg",    
-                size="large",
-                link="https://www.oaks.cloud/")
-            ""
-            st.title(f":house:**Homepage**")
-    with st.form(key="history_language_form"):
-        with col2:
-            lang = st.selectbox(
-                "A", 
-                ["IT", "EN", "ES"], 
-                label_visibility="hidden",
-                key="history_lang_selector"  
-            )
-            # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
-            current_lang = translations[lang]
-            st.session_state.translations = translations
+    with col1:
+        st.logo("https://www.oaks.cloud/_next/static/media/oaks.1ea4e367.svg",    
+            size="large",
+            link="https://www.oaks.cloud/")
+        ""
+        st.title(f":house:**Homepage**")
+    with col2:
+        lang = st.selectbox(
+            "A", 
+            ["IT", "EN", "ES"], 
+            label_visibility="hidden",
+            key="history_lang_selector"  
+        )
+        # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
+        current_lang = translations[lang]
+        st.session_state.translations = translations
 
 #qua andiamo a gestire il login dell'utente, usando il nostro secrets.toml per 
 #eseguire accesso tramite Microsoft Azure Entra
@@ -53,10 +45,12 @@ else:
         if st.button(current_lang["logout_button"], key="history_logout_btn"):
             st.logout()
 
-    #andiamo a creare una cartella temporanea per i file
-    #che andremo a generare durante l'analisi dei documenti
-    temp_files_dir = "temp_files"
-    os.makedirs(temp_files_dir, exist_ok=True)
+    # Use the temporary directory from the main page
+    if 'temp_files_dir' in st.session_state:
+        temp_files_dir = st.session_state.temp_files_dir
+    else:
+        temp_files_dir = "temp_files"
+        os.makedirs(temp_files_dir, exist_ok=True)
 
 
     st.title(f"📋 {current_lang.get('analysis_history', 'Analysis History')}")
@@ -65,7 +59,7 @@ else:
     #andiamo a prendere i dati dal nostro database SQLite
     #e a creare una lista con le informazioni delle analisi effettuate 
     #in modo da poterle visualizzare in un formato tabellare
-    view_analysis = get_crono(cursor)
+    view_analysis = get_crono()
 
     #qua definiamo una funzione per visualizzare i dettagli dell'analisi ed usiamo il decoratore @st.dialog per creare un dialogo
     #che ci permetta di visualizzarli
@@ -73,7 +67,7 @@ else:
     def view_analysis_details(analysis_id, analysis_name, analysis_date):
 
         #andiamo a recuperare i dati dell'analisi dal database
-        analysis_data = get_data_analysis(cursor, analysis_id)
+        analysis_data = get_data_analysis(analysis_id)
 
         if not analysis_data:
             st.error(current_lang.get("data_not_found", "Analysis data not found."))
@@ -98,7 +92,6 @@ else:
                 return
         except Exception as e:
             st.error(current_lang.get("rectangle_error", "Error").format(error=e))
-            st.button(current_lang.get("close_button", "Close"), key=f"close_dialog_{analysis_id}")
             return
 
         # Configuriamo lo stato della sessione per edit_data
@@ -164,6 +157,3 @@ else:
                     st.divider()
     else:
         st.info(current_lang.get("no_history", "No analysis history available."))
-
-    #chiudiamo la connessione al database
-    conn.close()

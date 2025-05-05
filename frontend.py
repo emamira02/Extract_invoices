@@ -13,7 +13,6 @@ import pymupdf
 from PIL import ImageDraw
 from dotenv import load_dotenv
 from fuzzywuzzy import fuzz
-import sqlite3
 
 load_dotenv()
 
@@ -21,6 +20,9 @@ load_dotenv()
 temp_files_dir = "temp_files"
 os.makedirs(temp_files_dir, exist_ok=True)
 
+#mettiamo la cartella temporanea in una variabile di sessione, in modo tale da non doverla creare ogni volta
+if 'temp_files_dir' not in st.session_state:
+    st.session_state.temp_files_dir = temp_files_dir
 
 # configuriamo la nostra pagina per visualizzare tutto centralmente, ed impostando il titolo
 st.set_page_config(
@@ -129,28 +131,23 @@ translations = {
     }
 }
 
-#assicuriamoci che il nostro database venga creato e che la connessione venga aperta per 
-#poi connetterci ad esso e creare un cursore per eseguire le query
+#connettiamoci al nostro db andando a prendere la conn ed il cursore presente nel nostro file database
 create_database()
-conn = sqlite3.connect('cronologia.db')
-cursor = conn.cursor()
 
 with st.sidebar:
     # Creiamo due colonne nel sidebar per allineare Logo+Titolo e Selectbox
     col1, col2 = st.columns(2, vertical_alignment="top")
-    with st.form(key="login_form"):
-        with col1:
-            st.logo("https://www.oaks.cloud/_next/static/media/oaks.1ea4e367.svg",    #inseriamo il logo dell'azienda nella nostra app
-                size="large",
-                link="https://www.oaks.cloud/")
-            ""
-            st.title(f":house:**Homepage**")
-    with st.form(key="language_form"):
-        with col2:
-            lang = st.selectbox("A", ["IT", "EN", "ES"], label_visibility="hidden")
-            # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
-            current_lang = translations[lang]
-            st.session_state.translations = translations
+    with col1:
+        st.logo("https://www.oaks.cloud/_next/static/media/oaks.1ea4e367.svg",    #inseriamo il logo dell'azienda nella nostra app
+            size="large",
+            link="https://www.oaks.cloud/")
+        ""
+        st.title(f":house:**Homepage**")
+    with col2:
+        lang = st.selectbox("A", ["IT", "EN", "ES"], label_visibility="hidden")
+        # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
+        current_lang = translations[lang]
+        st.session_state.translations = translations
 
 # andiamo a configurare i nostri log, creando un file a parte per visualizzarli
 logging.basicConfig(
@@ -516,19 +513,19 @@ else:
                         
                     #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
                     #andiamo a cancellare la più vecchia
-                        view_analysis = get_crono(cursor)
+                        view_analysis = get_crono()
                         if len(view_analysis) >= 10:
                             oldest_analysis = view_analysis[-1] 
                             oldest_id = oldest_analysis[0]
                             oldest_temp_file_path = os.path.join(temp_files_dir, f"temp_{oldest_id}.pdf")
                             delete_temp_file(oldest_temp_file_path)
-                            delete_oldest_analysis(conn, cursor)
+                            delete_oldest_analysis()
                             logging.info("Oldest analysis deleted to maintain history size limit.")
 
                     # rimuoviamo temporaneamente il blob dai dati estratti ed usiamo add_analysis_history per salvare 
                     # sia i dati estratti che il file come blob, per poi ripristinare il blob
                         file_blob = st.session_state['extracted_data'].pop("file_blob", None)
-                        add_analysis_history(conn, cursor, st.session_state['uploaded_file_name'], st.session_state['extracted_data'], file_blob)
+                        add_analysis_history(st.session_state['uploaded_file_name'], st.session_state['extracted_data'], file_blob)
                         if file_blob: 
                             st.session_state['extracted_data']["file_blob"] = file_blob
                             
