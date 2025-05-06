@@ -6,6 +6,8 @@ import logging
 from database import get_crono, get_data_analysis, clear_db_history
 from frontend import translations, edit_data, delete_temp_file, show_navigation
 
+st.session_state['current_page'] = 'history'
+
 with st.sidebar:
     # Creiamo due colonne nel sidebar per allineare Logo+Titolo e Selectbox
     col1, col2 = st.columns(2, vertical_alignment="top")

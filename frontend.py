@@ -162,19 +162,20 @@ translations = {
 create_database()
 
 with st.sidebar:
-    # Creiamo due colonne nel sidebar per allineare Logo+Titolo e Selectbox
-    col1, col2 = st.columns(2, vertical_alignment="top")
-    with col1:
-        st.logo("https://www.oaks.cloud/_next/static/media/oaks.1ea4e367.svg",    #inseriamo il logo dell'azienda nella nostra app
-            size="large",
-            link="https://www.oaks.cloud/")
-        ""
-        st.title(f":house:**Homepage**")
-    with col2:
-        lang = st.selectbox("A", ["IT", "EN", "ES"], label_visibility="hidden")
-        # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
-        current_lang = translations[lang]
-        st.session_state.translations = translations
+    if st.session_state.get("current_page") != "history":
+        # Creiamo due colonne nel sidebar per allineare Logo+Titolo e Selectbox
+        col1, col2 = st.columns(2, vertical_alignment="top")
+        with col1:
+            st.logo("https://www.oaks.cloud/_next/static/media/oaks.1ea4e367.svg",    #inseriamo il logo dell'azienda nella nostra app
+                size="large",
+                link="https://www.oaks.cloud/")
+            ""
+            st.title(f":house:**Homepage**")
+        with col2:
+            lang = st.selectbox("A", ["IT", "EN", "ES"], label_visibility="hidden")
+            # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
+            current_lang = translations[lang]
+            st.session_state.translations = translations
 
 # andiamo a configurare i nostri log, creando un file a parte per visualizzarli
 logging.basicConfig(
@@ -191,10 +192,13 @@ logging.basicConfig(
 def show_navigation(page_prefix=""):
     """Display consistent navigation buttons in the sidebar."""
     if st.button("📊 Dashboard", use_container_width=True, key=f"{page_prefix}_dashboard_btn"):
+        st.session_state['current_page'] = 'dashboard'
         st.switch_page("frontend.py")
     if st.button("📜 History", use_container_width=True, key=f"{page_prefix}_history_btn"):
+        st.session_state['current_page'] = 'history'
         st.switch_page("pages/1_🧾_History.py")
     if st.button("⚙️ Settings", use_container_width=True, key=f"{page_prefix}_settings_btn"):
+        st.session_state['current_page'] = 'settings'
         st.switch_page("pages/settings.py")
 
 #qua andiamo a gestire il login dell'utente, usando il nostro secrets.toml per 
@@ -209,16 +213,16 @@ if not st.user.is_logged_in:
 
 else:
     with st.sidebar:
-        if st.user.is_logged_in:
-            st.markdown(current_lang["greeting"].format(name=st.user.name, email=st.user.email))
-            logging.info(f"User {st.user.name} ({st.user.email}) successfully logged in.")
+        if st.session_state.get("current_page") != "history":
+            if st.user.is_logged_in:
+                st.markdown(current_lang["greeting"].format(name=st.user.name, email=st.user.email))
+                logging.info(f"User {st.user.name} ({st.user.email}) successfully logged in.")
 
-            if st.button(current_lang["logout_button"]):
-                st.logout()
-            st.markdown("---")
-            st.markdown("")
-            
-        show_navigation(page_prefix="dashboard")
+                if st.button(current_lang["logout_button"]):
+                    st.logout()
+                st.markdown("---")
+                st.markdown("")
+            show_navigation(page_prefix="dashboard")
                     
 
 #la funzione per gestire il file che viene caricato, se non è vuota allora il file
@@ -444,7 +448,8 @@ else:
         except Exception as e:
             logging.error(f"Error deleting temporary file {file_path}: {e}")
 
-    st.markdown(f"<h1 style='text-align: center;'>{current_lang['first_title'].replace(':blue[Azure AI]', '<span style="color:blue;">Azure AI</span>').replace(':blue-background[', '<span style="background-color:#b3d7fe;">').replace(']', '</span>')}</h1>", unsafe_allow_html=True)
+if st.session_state.get('current_page') != 'history':
+    st.markdown(f"<h1 style='text-align: center;'>{current_lang['first_title'].replace(':blue[Azure AI]', '<span style=\"color:blue;\">Azure AI</span>').replace(':blue-background[', '<span style=\"background-color:#b3d7fe;\">').replace(']', '</span>')}</h1>", unsafe_allow_html=True)
     st.markdown(f"<h3 style='text-align: center; font-weight: bold;'>{current_lang['second_title']}</h3>", unsafe_allow_html=True)
     st.markdown(f"<h5 style='text-align: center;'>{current_lang['third_title']}</h3>", unsafe_allow_html=True)
     st.markdown("---")
