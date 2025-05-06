@@ -15,6 +15,7 @@ ADD resources /usr/local/share/tessdata
 
 # Copia solo i file necessari
 COPY frontend.py backend.py database.py ./
+COPY pages ./pages
 
 ENV TESSDATA_PREFIX=/usr/local/share/tessdata/
 

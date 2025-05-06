@@ -199,7 +199,7 @@ def show_navigation(page_prefix=""):
 
 #qua andiamo a gestire il login dell'utente, usando il nostro secrets.toml per 
 #eseguire accesso tramite Microsoft Azure Entra
-if not st.experimental_user.is_logged_in:
+if not st.user.is_logged_in:
     st.title("Microsoft Login:streamlit:")
     st.subheader(f":material/Login: {current_lang['login_prompt']}")
     logging.info("Launched app, waiting for the User Login.")
@@ -209,9 +209,9 @@ if not st.experimental_user.is_logged_in:
 
 else:
     with st.sidebar:
-        if st.experimental_user.is_logged_in:
-            st.markdown(current_lang["greeting"].format(name=st.experimental_user.name, email=st.experimental_user.email))
-            logging.info(f"User {st.experimental_user.name} ({st.experimental_user.email}) successfully logged in.")
+        if st.user.is_logged_in:
+            st.markdown(current_lang["greeting"].format(name=st.user.name, email=st.user.email))
+            logging.info(f"User {st.user.name} ({st.user.email}) successfully logged in.")
 
             if st.button(current_lang["logout_button"]):
                 st.logout()
