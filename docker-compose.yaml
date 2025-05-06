@@ -6,3 +6,4 @@ services:
     volumes:
       - ./client.ini:/app/client.ini 
       - ./.streamlit/secrets.toml:/app/.streamlit/secrets.toml
+      - ./.streamlit/config.toml:/app/.streamlit/config.toml
