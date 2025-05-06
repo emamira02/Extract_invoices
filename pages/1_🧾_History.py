@@ -4,7 +4,7 @@ import datetime
 import pandas as pd
 import logging
 from database import get_crono, get_data_analysis, clear_db_history
-from frontend import translations, edit_data, delete_temp_file
+from frontend import translations, edit_data, delete_temp_file, show_navigation
 
 with st.sidebar:
     # Creiamo due colonne nel sidebar per allineare Logo+Titolo e Selectbox
@@ -44,6 +44,10 @@ else:
 
         if st.button(current_lang["logout_button"], key="history_logout_btn"):
             st.logout()
+        st.markdown("---")
+        st.markdown("")
+            
+        show_navigation(page_prefix="history")
 
     #usiamo la temp_files_dir present nel session_state per salvare i file temporanei
     if 'temp_files_dir' in st.session_state:
@@ -68,7 +72,7 @@ else:
             st.warning(current_lang.get("clear_warning", "Are you sure? This action cannot be undone."))
             col1, col2 = st.columns(2)
             with col1:
-                if st.button(current_lang.get("confirm", "Yes, Clear History"), key="confirm_clear"):
+                if st.button(current_lang.get("confirm_clear_history", "Yes, Clear History"), key="confirm_clear"):
                     try:
                         with st.spinner(current_lang.get("clearing", "Clearing history...")):
                             for file in os.listdir(temp_files_dir):
@@ -79,7 +83,7 @@ else:
                     except Exception as e:
                         st.error(f"Error: {e}")
                 with col2:
-                    if st.button(current_lang.get("cancel", "Cancel"), key="cancel_clear"):
+                    if st.button(current_lang.get("cancel_clear_history", "Cancel"), key="cancel_clear"):
                         st.rerun()
 
         if st.button(current_lang.get("clear_history", "🗑️ Clear All History")):
@@ -117,7 +121,7 @@ else:
                     temp_file.write(blob_data)
             else:
                 st.error(current_lang.get("data_not_found", "File data is missing."))
-                st.button(current_lang.get("close_button", "Close"), key=f"close_dialog_{analysis_id}")
+                st.button(current_lang.get("close_analysis", "Close"), key=f"close_dialog_{analysis_id}")
                 return
         except Exception as e:
             st.error(current_lang.get("rectangle_error", "Error").format(error=e))
@@ -180,9 +184,9 @@ else:
                         st.write(f"📅 {row['Date']}")
 
                     with col3:
-                        if st.button(current_lang.get("view_button", "View"), key=f"view_{row['ID']}"):
+                        if st.button(current_lang.get("view_analysis", "View"), key=f"view_{row['ID']}"):
                             view_analysis_details(row['ID'], row['Name'], row['Date'])
 
                     st.divider()
     else:
-        st.info(current_lang.get("no_history", "No analysis history available."))
+        st.info(current_lang.get("history_info", "No analysis history available."))

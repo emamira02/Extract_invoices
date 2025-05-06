@@ -27,7 +27,8 @@ if 'temp_files_dir' not in st.session_state:
 # configuriamo la nostra pagina per visualizzare tutto centralmente, ed impostando il titolo
 st.set_page_config(
     page_title="Data Extractor",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="auto",
 )
 
 # andiamo a definire le traduzioni in un dizionario, in modo tale da poterle usare in base alla lingua selezionata
@@ -41,6 +42,15 @@ translations = {
         "second_title": "Analizza i tuoi documenti e lascia che il nostro AI faccia il resto 🚀",
         "third_title": "In seguito potrai modificare i dati estratti, visualizzare il file caricato con i campi evidenziati e scaricare il file in formato JSON. ⬇️",
         "info_textinput": "Informazioni sul Venditore",
+        "no_analysis_history": "Non ci sono analisi in cronologia.",
+        "clear_warning": "Sei sicuro di voler cancellare tutta la cronologia? Questa azione non può essere annullata.",
+        "clear_history": "🗑️ Pulisci Cronologia",
+        "confirm_clear_history": "Sì, Pulisci Cronologia",
+        "cancel_clear_history": "Annulla",
+        "clear_success": "Cronologia cancellata con successo.",
+        "view_analysis": "Apri Analisi",
+        "analysis_details": "Dettagli Analisi",
+        "close_analysis": "Chiudi",
         "history_info" : "Non è disponibile alcuna analisi in cronologia.",
         "logout_button": "Log out",
         "greeting": "Ciao, **{name}**, {email}",
@@ -73,7 +83,15 @@ translations = {
         "second_title": "Analyze your documents and let our AI do the rest 🚀",
         "third_title": "Then you can edit the extracted data, view the uploaded file with highlighted fields, and download the file in JSON format. ⬇️",
         "info_textinput": "Vendor Information",
-        "history_info" : "No analysis history available.",
+        "no_analysis_history": "There are no analyses in history.",
+        "clear_warning": "Are you sure you want to clear all history? This action cannot be undone.",
+        "clear_history": "🗑️ Clear All History",
+        "confirm_clear_history": "Yes, Clear History",
+        "cancel_clear_history": "Cancel",
+        "clear_success": "History cleared successfully.",
+        "view_analysis": "Open Analysis",
+        "analysis_details": "Analysis Details",
+        "close_analysis": "Close",
         "logout_button": "Log out",
         "greeting": "Hello, **{name}**, {email}",
         "upload_label": "Upload an Invoice or a Receipt",
@@ -105,6 +123,15 @@ translations = {
         "second_title": "Analiza tus documentos y deja que nuestra IA haga el resto 🚀",
         "third_title": "Luego podrás editar los datos extraídos, ver el archivo cargado con los campos resaltados y descargar el archivo en formato JSON.⬇️",
         "info_textinput": "Informaciòn del Vendedor",
+        "no_analysis_history": "No hay análisis en el historial.",
+        "clear_warning": "¿Estás seguro de que deseas limpiar todo el historial? Esta acción no se puede deshacer.",
+        "clear_history": "🗑️ Limpiar todo el historial",
+        "confirm_clear_history": "Sí, limpiar historial",
+        "cancel_clear_history": "Cancelar",
+        "clear_success": "Historial limpiado con éxito.",
+        "view_analysis": "Abrir análisis",
+        "analysis_details": "Detalles del análisis",
+        "close_analysis": "Cerrar",
         "history_info" : "No hay análisis disponibles en el historial.",
         "logout_button": "Cerrar sesión",
         "greeting": "Hola, **{name}**, {email}",
@@ -160,6 +187,16 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+
+def show_navigation(page_prefix=""):
+    """Display consistent navigation buttons in the sidebar."""
+    if st.button("📊 Dashboard", use_container_width=True, key=f"{page_prefix}_dashboard_btn"):
+        st.switch_page("frontend.py")
+    if st.button("📜 History", use_container_width=True, key=f"{page_prefix}_history_btn"):
+        st.switch_page("pages/1_🧾_History.py")
+    if st.button("⚙️ Settings", use_container_width=True, key=f"{page_prefix}_settings_btn"):
+        st.switch_page("pages/settings.py")
+
 #qua andiamo a gestire il login dell'utente, usando il nostro secrets.toml per 
 #eseguire accesso tramite Microsoft Azure Entra
 if not st.experimental_user.is_logged_in:
@@ -176,8 +213,13 @@ else:
             st.markdown(current_lang["greeting"].format(name=st.experimental_user.name, email=st.experimental_user.email))
             logging.info(f"User {st.experimental_user.name} ({st.experimental_user.email}) successfully logged in.")
 
-        if st.button(current_lang["logout_button"]):
-            st.logout()
+            if st.button(current_lang["logout_button"]):
+                st.logout()
+            st.markdown("---")
+            st.markdown("")
+            
+        show_navigation(page_prefix="dashboard")
+                    
 
 #la funzione per gestire il file che viene caricato, se non è vuota allora il file
 #viene letto, andando a verificare però che il file sia un file pdf, ed in caso creando
