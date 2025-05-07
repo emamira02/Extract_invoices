@@ -285,7 +285,7 @@ else:
             return None, None
 
 #definiamo una funziona avente come parametro i nostri dati
-    def edit_data(data, key_prefix="", show_image_with_bbox=True):
+    def edit_data(data, current_lang, key_prefix="", show_image_with_bbox=True):
         data_it = {}
 
         # qua creiamo una lista di dizionari per rappresentare gli elementi estratti e ciascun dizionario contiene le 
@@ -540,7 +540,7 @@ if st.session_state.get('current_page') != 'history':
             if st.session_state['extracted_data']:
                 if st.session_state['analysis_source'] == 'new':
                     st.header(current_lang["analysis_info"])
-                    edit_data(st.session_state['extracted_data'], key_prefix="new_upload")
+                    edit_data(st.session_state['extracted_data'], current_lang=current_lang, key_prefix="new_upload")
 
                 else:
                     logging.info("Skipping duplicate display for new analysis.")
