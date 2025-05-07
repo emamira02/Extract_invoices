@@ -99,7 +99,7 @@ else:
     #qua definiamo una funzione per visualizzare i dettagli dell'analisi ed usiamo il decoratore @st.dialog per creare un dialogo
     #che ci permetta di visualizzarli
     @st.dialog(title= current_lang.get('analysis_details', 'Analysis Details'))
-    def view_analysis_details(analysis_id, analysis_name, analysis_date):
+    def view_analysis_details(analysis_id, analysis_name, analysis_date, current_lang):
 
         #andiamo a recuperare i dati dell'analisi dal database
         analysis_data = get_data_analysis(analysis_id)
@@ -139,7 +139,7 @@ else:
 
         #richiamiamo la funzione edit_data dal frontend
         # e gli passiamo i dati dell'analisi
-        edit_data(analysis_data)
+        edit_data(analysis_data, current_lang=current_lang)
 
         # Pulizia del file temporaneo usando la funzione delete_temp_file dal frontend
         try:
@@ -187,7 +187,7 @@ else:
 
                     with col3:
                         if st.button(current_lang.get("view_analysis", "View"), key=f"view_{row['ID']}"):
-                            view_analysis_details(row['ID'], row['Name'], row['Date'])
+                            view_analysis_details(row['ID'], row['Name'], row['Date'], current_lang)
 
                     st.divider()
     else:
