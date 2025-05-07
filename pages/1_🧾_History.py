@@ -62,42 +62,8 @@ else:
     col1,col3 = st.columns([4.3,1])
     with col1:
         st.title(f"📋 {current_lang.get('analysis_history', 'Analysis History')}")
-        #andiamo a definire una funzione per cercare le analisi in base alla query di ricerca
-        #e a restituire soltanto i nomi delle analisi che corrispondono alla query di ricerca
-        def search_analysis(search_term):
-            all_analysis = get_crono()
-            results = []
-            if search_term:
-                for analysis in all_analysis:
-                    if search_term.lower() in analysis[1].lower():
-                        results.append(analysis[1])  # Return only the names as search results
-            return results
-        
-        #andiamo a creare una barra di ricerca per filtrare le analisi in base alla query di ricerca
-        search_query = st_searchbox(
-            label="",
-            search_function=search_analysis,
-            placeholder=current_lang.get("search_analysis", "Search analysis..."),
-            key="history_search"
-        )
-        
-        #andiamo a definire una funzione per filtrare le analisi in base alla query di ricerca
-        #e a restituire tutte le analisi se la query è vuota
-        #in questo modo possiamo visualizzare solo le analisi che corrispondono alla query di ricerca
-        def filter_analyses():
-            all_analysis = get_crono()
-            if search_query:
-                return [analysis for analysis in all_analysis if search_query.lower() in analysis[1].lower()]
-            return all_analysis
-        
-        
 
     with col3:
-        ""
-        ""
-        ""
-        ""
-        ""
         #usiamo il decoratore @st.dialog per creare un popup che ci permetta di visualizzare il messaggio di avviso
         #e di confermare l'azione di cancellazione della cronologia
         @st.dialog(title=current_lang.get("clear_history_title", "Clear History"))
@@ -113,17 +79,48 @@ else:
                         with st.spinner(current_lang.get("clearing", "Clearing history...")):
                             for file in os.listdir(temp_files_dir):
                                 os.remove(os.path.join(temp_files_dir, file))
-                                clear_db_history()
-                                st.success(current_lang.get("clear_success", "History cleared successfully!"))
-                                st.rerun()
+                            clear_db_history()
+                            st.success(current_lang.get("clear_success", "History cleared successfully!"))
+                            st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
             with col2:
                 if st.button(current_lang.get("cancel_clear_history", "Cancel"), key="cancel_clear"):
                     st.rerun()
 
+    search_col, button_col = st.columns([4.3, 1])
+    
+    with search_col:
+        #andiamo a definire una funzione per cercare le analisi in base alla query di ricerca
+        #e a restituire soltanto i nomi delle analisi che corrispondono alla query di ricerca
+        def search_analysis(search_term):
+            all_analysis = get_crono()
+            results = []
+            if search_term:
+                for analysis in all_analysis:
+                    if search_term.lower() in analysis[1].lower():
+                        results.append(analysis[1])
+            return results
+        #andiamo a creare una barra di ricerca per filtrare le analisi in base alla query di ricerca
+        search_query = st_searchbox(
+            label="",
+            search_function=search_analysis,
+            placeholder=current_lang.get("search_analysis", "Search analysis..."),
+            key="history_search"
+        )
+    
+    with button_col:
         if st.button(current_lang.get("clear_history", "🗑️ Clear All History")):
             confirm_clear_history()
+
+    #andiamo a definire una funzione per filtrare le analisi in base alla query di ricerca
+        #e a restituire tutte le analisi se la query è vuota
+        #in questo modo possiamo visualizzare solo le analisi che corrispondono alla query di ricerca
+    def filter_analyses():
+        all_analysis = get_crono()
+        if search_query:
+            return [analysis for analysis in all_analysis if search_query.lower() in analysis[1].lower()]
+        return all_analysis
 
     container = st.container(border=True)
     with container:
