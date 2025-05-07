@@ -5,6 +5,7 @@ import pandas as pd
 import logging
 from database import get_crono, get_data_analysis, clear_db_history
 from frontend import translations, edit_data, delete_temp_file, show_navigation
+from streamlit_searchbox import st_searchbox
 
 st.session_state['current_page'] = 'history'
 
@@ -59,11 +60,42 @@ else:
         os.makedirs(temp_files_dir, exist_ok=True)
 
     col1,col3 = st.columns([4.3,1])
-    ""
-    ""
     with col1:
         st.title(f"📋 {current_lang.get('analysis_history', 'Analysis History')}")
+        #andiamo a definire una funzione per cercare le analisi in base alla query di ricerca
+        #e a restituire soltanto i nomi delle analisi che corrispondono alla query di ricerca
+        def search_analysis(search_term):
+            all_analysis = get_crono()
+            results = []
+            if search_term:
+                for analysis in all_analysis:
+                    if search_term.lower() in analysis[1].lower():
+                        results.append(analysis[1])  # Return only the names as search results
+            return results
+        
+        #andiamo a creare una barra di ricerca per filtrare le analisi in base alla query di ricerca
+        search_query = st_searchbox(
+            label="",
+            search_function=search_analysis,
+            placeholder=current_lang.get("search_analysis", "Search analysis..."),
+            key="history_search"
+        )
+        
+        #andiamo a definire una funzione per filtrare le analisi in base alla query di ricerca
+        #e a restituire tutte le analisi se la query è vuota
+        #in questo modo possiamo visualizzare solo le analisi che corrispondono alla query di ricerca
+        def filter_analyses():
+            all_analysis = get_crono()
+            if search_query:
+                return [analysis for analysis in all_analysis if search_query.lower() in analysis[1].lower()]
+            return all_analysis
+        
+        
+
     with col3:
+        ""
+        ""
+        ""
         ""
         ""
         #usiamo il decoratore @st.dialog per creare un popup che ci permetta di visualizzare il messaggio di avviso
@@ -98,7 +130,7 @@ else:
         #andiamo a prendere i dati dal nostro database SQLite
         #e a creare una lista con le informazioni delle analisi effettuate 
         #in modo da poterle visualizzare in un formato tabellare
-        view_analysis = get_crono()
+        view_analysis = filter_analyses()
 
         #qua definiamo una funzione per visualizzare i dettagli dell'analisi ed usiamo il decoratore @st.dialog per creare un dialogo
         #che ci permetta di visualizzarli
@@ -185,7 +217,12 @@ else:
 
         #per ciascun'analisi andiamo a creare una lista con le informazioni delle analisi effettuate
             for _, row in df.iterrows():
-                col1, col2, col3 = st.columns([4, 2, 1])
+                if lang == "IT":
+                    col1, col2, col3 = st.columns([3, 2, 0.81])
+                elif lang == "EN":
+                    col1, col2, col3 = st.columns([3, 2, 0.96])
+                else:
+                    col1, col2, col3 = st.columns([3, 2.5, 0.77])
 
                 with col1:
                     st.write(f"**{row['Name']}**")
