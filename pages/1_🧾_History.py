@@ -58,7 +58,9 @@ else:
         temp_files_dir = "temp_files"
         os.makedirs(temp_files_dir, exist_ok=True)
 
-    col1,col3 = st.columns([3,1])
+    col1,col3 = st.columns([4.3,1])
+    ""
+    ""
     with col1:
         st.title(f"📋 {current_lang.get('analysis_history', 'Analysis History')}")
     with col3:
@@ -84,73 +86,80 @@ else:
                                 st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
-                with col2:
-                    if st.button(current_lang.get("cancel_clear_history", "Cancel"), key="cancel_clear"):
-                        st.rerun()
+            with col2:
+                if st.button(current_lang.get("cancel_clear_history", "Cancel"), key="cancel_clear"):
+                    st.rerun()
 
         if st.button(current_lang.get("clear_history", "🗑️ Clear All History")):
             confirm_clear_history()
 
-    #andiamo a prendere i dati dal nostro database SQLite
-    #e a creare una lista con le informazioni delle analisi effettuate 
-    #in modo da poterle visualizzare in un formato tabellare
-    view_analysis = get_crono()
+    container = st.container(border=True)
+    with container:
+        #andiamo a prendere i dati dal nostro database SQLite
+        #e a creare una lista con le informazioni delle analisi effettuate 
+        #in modo da poterle visualizzare in un formato tabellare
+        view_analysis = get_crono()
 
-    #qua definiamo una funzione per visualizzare i dettagli dell'analisi ed usiamo il decoratore @st.dialog per creare un dialogo
-    #che ci permetta di visualizzarli
-    @st.dialog(title= current_lang.get('analysis_details', 'Analysis Details'))
-    def view_analysis_details(analysis_id, analysis_name, analysis_date, current_lang):
+        #qua definiamo una funzione per visualizzare i dettagli dell'analisi ed usiamo il decoratore @st.dialog per creare un dialogo
+        #che ci permetta di visualizzarli
+        @st.dialog(width = "large", title= current_lang.get('analysis_details', 'Analysis Details'))
+        def view_analysis_details(analysis_id, analysis_name, analysis_date, current_lang):
 
-        #andiamo a recuperare i dati dell'analisi dal database
-        analysis_data = get_data_analysis(analysis_id)
+            #qua andiamo a salvare i dati dell'analisi selezionata nella sessione
+            #in modo da poterli utilizzare in seguito per il download del file
+            st.session_state['selected_analysis_name'] = analysis_name
+            st.session_state['selected_analysis_id'] = analysis_id
+            st.session_state['uploaded_file_name'] = analysis_name   
 
-        if not analysis_data:
-            st.error(current_lang.get("data_not_found", "Analysis data not found."))
-            return
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader(analysis_name)
-        with col2:
-            st.write(f"{current_lang.get('analysis_date', 'Date')}: {analysis_date}")
+            #andiamo a recuperare i dati dell'analisi dal database
+            analysis_data = get_data_analysis(analysis_id)
 
-            #andiamo ad unire i dati dell'analisi con i dati del file blob
-            #e a creare un file temporaneo per visualizzare il documento
-        temp_file_path = os.path.join(temp_files_dir, f"temp_view_{analysis_id}.pdf")
-        try:
-            blob_data = analysis_data.get("file_blob")
-            if blob_data:
-                with open(temp_file_path, "wb") as temp_file:
-                    temp_file.write(blob_data)
-            else:
-                st.error(current_lang.get("data_not_found", "File data is missing."))
-                st.button(current_lang.get("close_analysis", "Close"), key=f"close_dialog_{analysis_id}")
+            if not analysis_data:
+                st.error(current_lang.get("data_not_found", "Analysis data not found."))
                 return
-        except Exception as e:
-            st.error(current_lang.get("rectangle_error", "Error").format(error=e))
-            return
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader(analysis_name)
+            with col2:
+                st.write(f"{current_lang.get('analysis_date', 'Date')}: {analysis_date}")
 
-        # Configuriamo lo stato della sessione per edit_data
-        history_session_key = f"history_view_{analysis_id}"
-        if history_session_key not in st.session_state:
-            st.session_state[history_session_key] = {}
+                #andiamo ad unire i dati dell'analisi con i dati del file blob
+                #e a creare un file temporaneo per visualizzare il documento
+            temp_file_path = os.path.join(temp_files_dir, f"temp_view_{analysis_id}.pdf")
+            try:
+                blob_data = analysis_data.get("file_blob")
+                if blob_data:
+                    with open(temp_file_path, "wb") as temp_file:
+                        temp_file.write(blob_data)
+                else:
+                    st.error(current_lang.get("data_not_found", "File data is missing."))
+                    st.button(current_lang.get("close_analysis", "Close"), key=f"close_dialog_{analysis_id}")
+                    return
+            except Exception as e:
+                st.error(current_lang.get("rectangle_error", "Error").format(error=e))
+                return
 
-        # Salviamo il percorso del file nella sessione per edit_data
-        st.session_state['temporary_file_path'] = temp_file_path
+            # Configuriamo lo stato della sessione per edit_data
+            history_session_key = f"history_view_{analysis_id}"
+            if history_session_key not in st.session_state:
+                st.session_state[history_session_key] = {}
 
-        #richiamiamo la funzione edit_data dal frontend
-        # e gli passiamo i dati dell'analisi
-        edit_data(analysis_data, current_lang=current_lang)
+            # Salviamo il percorso del file nella sessione per edit_data
+            st.session_state['temporary_file_path'] = temp_file_path
 
-        # Pulizia del file temporaneo usando la funzione delete_temp_file dal frontend
-        try:
-            delete_temp_file(temp_file_path)
-        except Exception as e:
-            logging.error(f"Error deleting temporary file: {e}")
+            #richiamiamo la funzione edit_data dal frontend
+            # e gli passiamo i dati dell'analisi
+            edit_data(analysis_data, current_lang=current_lang)
 
-    # se la view_analysis è vuota, mostriamo un messaggio di avviso altrimenti mostriamo la cronologia delle analisi 
-    # e un bottone per visualizzare i dettagli
-    if view_analysis:
-        with st.container():
+            # Pulizia del file temporaneo usando la funzione delete_temp_file dal frontend
+            try:
+                delete_temp_file(temp_file_path)
+            except Exception as e:
+                logging.error(f"Error deleting temporary file: {e}")
+
+        # se la view_analysis è vuota, mostriamo un messaggio di avviso altrimenti mostriamo la cronologia delle analisi 
+        # e un bottone per visualizzare i dettagli
+        if view_analysis:
             history_data = []
             for analysis in view_analysis:
                 analysis_id = analysis[0]
@@ -176,19 +185,18 @@ else:
 
         #per ciascun'analisi andiamo a creare una lista con le informazioni delle analisi effettuate
             for _, row in df.iterrows():
-                with st.container():
-                    col1, col2, col3 = st.columns([3, 2, 1])
+                col1, col2, col3 = st.columns([4, 2, 1])
 
-                    with col1:
-                        st.write(f"**{row['Name']}**")
+                with col1:
+                    st.write(f"**{row['Name']}**")
 
-                    with col2:
-                        st.write(f"📅 {row['Date']}")
+                with col2:
+                    st.write(f"📅 {row['Date']}")
 
-                    with col3:
-                        if st.button(current_lang.get("view_analysis", "View"), key=f"view_{row['ID']}"):
-                            view_analysis_details(row['ID'], row['Name'], row['Date'], current_lang)
+                with col3:
+                    if st.button(current_lang.get("view_analysis", "View"), key=f"view_{row['ID']}"):
+                        view_analysis_details(row['ID'], row['Name'], row['Date'], current_lang)
 
-                    st.divider()
-    else:
-        st.info(current_lang.get("history_info", "No analysis history available."))
+                st.divider()
+        else:
+            st.info(current_lang.get("history_info", "No analysis history available."))
