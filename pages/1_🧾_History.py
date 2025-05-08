@@ -7,6 +7,10 @@ from database import get_crono, get_data_analysis, clear_db_history
 from frontend import translations, edit_data, delete_temp_file, show_navigation
 from streamlit_searchbox import st_searchbox
 
+#settiamo la lingua in italiano di default se non è già presente nella sessione
+if 'language' not in st.session_state:
+    st.session_state['language'] = 'IT'
+
 st.session_state['current_page'] = 'history'
 
 with st.sidebar:
@@ -23,10 +27,17 @@ with st.sidebar:
             "A", 
             ["IT", "EN", "ES"], 
             label_visibility="hidden",
-            key="history_lang_selector"  
+            key="history_lang_selector",
+            index=["IT", "EN", "ES"].index(st.session_state['language']), 
+            on_change=lambda: st.session_state.update(language=st.session_state.history_lang_selector)
         )
+
+        #andiamo a gestire il cambio della lingua in base alla selezione dell'utente
+        if lang != st.session_state['language']:
+            st.session_state['language'] = lang
+
         # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
-        current_lang = translations[lang]
+        current_lang = translations[st.session_state['language']]
         st.session_state.translations = translations
 
 #qua andiamo a gestire il login dell'utente, usando il nostro secrets.toml per 
@@ -88,7 +99,7 @@ else:
                 if st.button(current_lang.get("cancel_clear_history", "Cancel"), key="cancel_clear"):
                     st.rerun()
 
-    search_col, button_col = st.columns([4.3, 1])
+    search_col, clear_button_col = st.columns([4, 1])
     
     with search_col:
         #andiamo a definire una funzione per cercare le analisi in base alla query di ricerca
@@ -109,7 +120,7 @@ else:
             key="history_search"
         )
     
-    with button_col:
+    with clear_button_col:
         if st.button(current_lang.get("clear_history", "🗑️ Clear All History")):
             confirm_clear_history()
 
@@ -123,11 +134,13 @@ else:
         return all_analysis
 
     container = st.container(border=True)
-    with container:
+    cols = st.columns([0.0001, 0.95, 0.23])
+    with cols[1]:
+        with container:
         #andiamo a prendere i dati dal nostro database SQLite
         #e a creare una lista con le informazioni delle analisi effettuate 
         #in modo da poterle visualizzare in un formato tabellare
-        view_analysis = filter_analyses()
+            view_analysis = filter_analyses()
 
         #qua definiamo una funzione per visualizzare i dettagli dell'analisi ed usiamo il decoratore @st.dialog per creare un dialogo
         #che ci permetta di visualizzarli
@@ -214,12 +227,7 @@ else:
 
         #per ciascun'analisi andiamo a creare una lista con le informazioni delle analisi effettuate
             for _, row in df.iterrows():
-                if lang == "IT":
-                    col1, col2, col3 = st.columns([3, 2, 0.81])
-                elif lang == "EN":
-                    col1, col2, col3 = st.columns([3, 2, 0.96])
-                else:
-                    col1, col2, col3 = st.columns([3, 2.5, 0.77])
+                col1, col2, col3 = st.columns([4, 1.8, 1])
 
                 with col1:
                     st.write(f"**{row['Name']}**")

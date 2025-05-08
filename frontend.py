@@ -16,6 +16,10 @@ from fuzzywuzzy import fuzz
 
 load_dotenv()
 
+#settiamo la lingua di default in italiano, se non è già presente nella sessione
+if 'language' not in st.session_state:
+    st.session_state['language'] = 'IT' 
+
 #andiamo a caricare i nostri file temporanei in una cartella specifica
 temp_files_dir = "temp_files"
 os.makedirs(temp_files_dir, exist_ok=True)
@@ -172,9 +176,20 @@ with st.sidebar:
             ""
             st.title(f":house:**Homepage**")
         with col2:
-            lang = st.selectbox("A", ["IT", "EN", "ES"], label_visibility="hidden")
+            lang = st.selectbox(
+                "A", 
+                ["IT", "EN", "ES"], 
+                label_visibility="hidden",
+                key="dashboard_lang_selector",
+                index=["IT", "EN", "ES"].index(st.session_state['language']),  
+                on_change=lambda: st.session_state.update(language=st.session_state.dashboard_lang_selector) 
+            )
+            #andiamo a salvare la lingua selezionata nella sessione, in modo tale da non doverla cambiare ogni volta
+            if lang != st.session_state['language']:
+                st.session_state['language'] = lang
+
             # selezioniamo il dizionario della lingua corrente in base alla selezione dell'utente
-            current_lang = translations[lang]
+            current_lang = translations[st.session_state['language']]
             st.session_state.translations = translations
 
 # andiamo a configurare i nostri log, creando un file a parte per visualizzarli
