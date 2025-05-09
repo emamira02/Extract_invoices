@@ -11,7 +11,9 @@ Questo progetto fornisce un'applicazione Streamlit che estrae dati da fatture e 
 *   **Download JSON:** Fornisce un pulsante di download per i dati estratti e modificati in formato JSON.
 *   **Autenticazione Utente:** Protegge l'accesso con il login di Microsoft Azure Entra ID tramite Streamlit's `st.experimental_user`.
 *   **Gestione della Cronologia:** Memorizza fino a 10 analisi nel database SQLite integrato, permettendo agli utenti di rivedere e scaricare analisi precedenti. Le analisi più vecchie vengono automaticamente eliminate per mantenere il limite.
-*   **Supporto Multilingue:** Interfaccia utente tradotta in Italiano, Inglese e Spagnolo.
+*   **Supporto Multilingue:** Interfaccia utente tradotta in Italiano, Inglese e Spagnolo, selezionabile tramite un menu a tendina nel sidebar.
+*   **Ricerca Analisi:** Possibilità di filtrare la cronologia delle analisi tramite una barra di ricerca.
+*   **Pulizia Cronologia:** Pulsante per cancellare l'intera cronologia delle analisi, con richiesta di conferma.
 *   **Gestione File Temporanei:** I file caricati vengono salvati in una cartella temporanea (`temp_files`) e gestiti per ridurre l'uso di memoria.
 *   **Dockerizzato:** Facilmente implementabile con Docker.
 
@@ -19,7 +21,7 @@ Questo progetto fornisce un'applicazione Streamlit che estrae dati da fatture e 
 
 *   **Azure Subscription:** Una sottoscrizione Azure attiva con accesso ad Azure AI Document Intelligence.
 *   **Azure AI Document Intelligence Resource:** Una risorsa Document Intelligence creata nella tua sottoscrizione Azure. Avrai bisogno della chiave API e dell'endpoint per questa risorsa.
-*   **Microsoft Azure Entra ID:** Un Microsoft Azure Entra ID per l'autenticazione utente. Devi registrare un'applicazione in Azure AD e ottenere il Client ID e il Client Secret.
+*   **Microsoft Azure Entra ID:** Un Microsoft Azure Entra ID per l'autenticazione utente. Devi registrare un'applicazione in Azure AD e ottenere il Client ID e il Client Secret. Imposta l'URL di reindirizzamento (Redirect URI) dell'applicazione.
 *   **Python 3.12:** Python 3.12 o superiore installato.
 *   **Docker:** Docker installato per la containerizzazione(opzionale).
 
