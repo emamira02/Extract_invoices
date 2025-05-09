@@ -174,7 +174,7 @@ with st.sidebar:
                 size="large",
                 link="https://www.oaks.cloud/")
             ""
-            st.title(f":house:**Homepage**")
+            st.title(":globe_with_meridians:**Dashboard**")
         with col2:
             lang = st.selectbox(
                 "A", 
@@ -206,15 +206,12 @@ logging.basicConfig(
 
 def show_navigation(page_prefix=""):
     """Display consistent navigation buttons in the sidebar."""
-    if st.button("📊 Dashboard", use_container_width=True, key=f"{page_prefix}_dashboard_btn"):
+    if st.button(":house:**Homepage**", use_container_width=True, key=f"{page_prefix}_dashboard_btn"):
         st.session_state['current_page'] = 'dashboard'
         st.switch_page("frontend.py")
     if st.button("📜 History", use_container_width=True, key=f"{page_prefix}_history_btn"):
         st.session_state['current_page'] = 'history'
         st.switch_page("pages/1_🧾_History.py")
-    if st.button("⚙️ Settings", use_container_width=True, key=f"{page_prefix}_settings_btn"):
-        st.session_state['current_page'] = 'settings'
-        st.switch_page("pages/settings.py")
 
 #qua andiamo a gestire il login dell'utente, usando il nostro secrets.toml per 
 #eseguire accesso tramite Microsoft Azure Entra
@@ -424,11 +421,24 @@ else:
                 "Totale": data_it["Totale"],
                 "Lista Prodotti": lista_prodotti
             }
+
+            #andiamo a tradurre le chiavi prese nella lingua selezionata, affinchè il file json sia nella lingua corretta
+            translated_json_data = {}
+            translated_json_data[current_lang["text_input"][0]] = json_data_italiano["Nome Venditore"]
+            translated_json_data[current_lang["text_input"][1]] = json_data_italiano["Indirizzo Venditore"]
+            translated_json_data[current_lang["text_input"][2]] = json_data_italiano["Numero di telefono Venditore"]
+            translated_json_data[current_lang["text_input"][3]] = json_data_italiano["Data"]
+            translated_json_data[current_lang["text_input"][4]] = json_data_italiano["Orario"]
+            translated_json_data[current_lang["text_input"][5]] = json_data_italiano["PIVA"]
+            translated_json_data[current_lang["text_input"][6]] = json_data_italiano["Totale"]
+            product_list_key = {"IT": "Lista Prodotti", "EN": "Product List", "ES": "Lista de Productos"}[st.session_state['language']]
+            translated_json_data[product_list_key] = lista_prodotti
+
         #usando un try-except per gestire eventuali errori, andiamo a creare un file json usando la libreria json e buffer
         #che andremo a scrivere e scaricare, in caso di successo restituisce un messaggio di successo, altrimenti un errore
         #relativo all'aggiornamento e download del file, restituisce i dati in italiano aggiornati 
             try:
-                json_string = json.dumps(json_data_italiano, indent=4, ensure_ascii=False)
+                json_string = json.dumps(translated_json_data, indent=4, ensure_ascii=False)
                 buff = BytesIO()
                 buff.write(json_string.encode('utf-8'))
                 buff.seek(0)

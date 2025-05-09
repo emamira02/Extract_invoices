@@ -21,7 +21,7 @@ with st.sidebar:
             size="large",
             link="https://www.oaks.cloud/")
         ""
-        st.title(f":house:**Homepage**")
+        st.title(f":globe_with_meridians:**Dashboard**")
     with col2:
         lang = st.selectbox(
             "A", 
@@ -146,7 +146,6 @@ else:
         #che ci permetta di visualizzarli
         @st.dialog(width = "large", title= current_lang.get('analysis_details', 'Analysis Details'))
         def view_analysis_details(analysis_id, analysis_name, analysis_date, current_lang):
-
             #qua andiamo a salvare i dati dell'analisi selezionata nella sessione
             #in modo da poterli utilizzare in seguito per il download del file
             st.session_state['selected_analysis_name'] = analysis_name
