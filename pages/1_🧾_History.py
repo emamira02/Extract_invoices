@@ -114,9 +114,7 @@ else:
             return results
         #andiamo a creare una barra di ricerca per filtrare le analisi in base alla query di ricerca
         search_query = st_searchbox(
-            label="",
             search_function=search_analysis,
-            placeholder=current_lang.get("search_analysis", "Search analysis..."),
             key="history_search"
         )
     
