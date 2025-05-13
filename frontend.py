@@ -28,7 +28,7 @@ if 'temp_files_dir' not in st.session_state:
 
 # configuriamo la nostra pagina per visualizzare tutto centralmente, ed impostando il titolo
 st.set_page_config(
-    page_title="Data Extractor",
+    page_title="Data Extractor ",
     layout="wide",
     initial_sidebar_state="auto",
 )
@@ -563,168 +563,168 @@ else:
         except Exception as e:
             logging.error(f"Error deleting temporary file {file_path}: {e}")
 
-if st.session_state.get('current_page') != 'history':
-    st.markdown(f"<h1 style='text-align: center;'>{current_lang['first_title'].replace(':blue[Azure AI]', '<span style=\"color:blue;\">Azure AI</span>').replace(':blue-background[', '<span style=\"background-color:#b3d7fe;\">').replace(']', '</span>')}</h1>", unsafe_allow_html=True)
-    st.markdown(f"<h3 style='text-align: center; font-weight: bold;'>{current_lang['second_title']}</h3>", unsafe_allow_html=True)
-    st.markdown(f"<h5 style='text-align: center;'>{current_lang['third_title']}</h3>", unsafe_allow_html=True)
-    st.markdown("---")
+    if st.session_state.get('current_page') != 'history':
+        st.markdown(f"<h1 style='text-align: center;'>{current_lang['first_title'].replace(':blue[Azure AI]', '<span style=\"color:blue;\">Azure AI</span>').replace(':blue-background[', '<span style=\"background-color:#b3d7fe;\">').replace(']', '</span>')}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='text-align: center; font-weight: bold;'>{current_lang['second_title']}</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h5 style='text-align: center;'>{current_lang['third_title']}</h3>", unsafe_allow_html=True)
+        st.markdown("---")
 
-    #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
-    st.markdown(f"### :receipt: {current_lang['upload_label']}<div style='margin-bottom: -70px;'></div>", unsafe_allow_html=True)
-    uploaded_file = st.file_uploader(
-        label=current_lang["upload_label"], 
-        type=["pdf", "jpg","png", "jpeg"],
-        key="file_uploader",
-        label_visibility="hidden",
-        )
-    logging.info("Waiting for the file upload")
-
-    #inizializziamo le variabili di sessione che andremo ad utilizzare
-    if 'extracted_data' not in st.session_state:
-        st.session_state['extracted_data'] = None
-    if 'uploaded_file_name' not in st.session_state:
-        st.session_state['uploaded_file_name'] = None
-    if 'temporary_file_path' not in st.session_state:
-        st.session_state['temporary_file_path'] = None
-    if 'analysis_source' not in st.session_state:
-        st.session_state['analysis_source'] = None
-
-#se il file è stato caricato con successo , gestiamo l'upload con la nostra funzione
-#e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto restituendo
-#estracted_data come variabile, in caso contrario restituisce un errore durante l'aalisi del documento
-    if uploaded_file is not None:
-        #inseriamo la variabile di sessione per l'uploaded_file in modo tale da
-        #riavviare l'analisi in caso di cambio file caricato, resettando i dati estratti
-        if uploaded_file.name != st.session_state.get('uploaded_file_name'):
-        
-            st.session_state['extracted_data'] = None  
-            st.session_state['uploaded_file_name'] = uploaded_file.name
-            if st.session_state['temporary_file_path']:
-                delete_temp_file(st.session_state['temporary_file_path'])
-                st.session_state['temporary_file_path'] = None
-
-        st.success(current_lang["success_upload"].format(file_name=uploaded_file.name))
-        logging.info(f"File {uploaded_file.name} uploaded successfully.")
-
-        temporary_file_path, file_content = handle_file_upload(uploaded_file)
-
-        if temporary_file_path:
-            if st.session_state['extracted_data'] is None or st.session_state['temporary_file_path'] != temporary_file_path:
-                st.session_state['temporary_file_path'] = temporary_file_path
-
-            if st.session_state['extracted_data'] is None:
-                with st.spinner(current_lang["analyzing_document"]):
-                    logging.info("Analyzing the document...")
-                    try:
-                        with open(temporary_file_path, "rb") as f: 
-                            file_content = f.read()
-                            
-                            #andiamo, con un try-except, ad aprire il file temporaneo in formato binario,
-                            #selezioniamo la prima pagina e generiamo un pixmap senza canale alpha
-                            #per evitare problemi di OCR, in caso di errore andiamo a restituire un errore
-                            try:
-                                doc = pymupdf.open(temporary_file_path)
-                                page = doc[0]
-                                pix = page.get_pixmap(alpha=False)
-                                
-                                #andiamo a creare un’immagine a partire dai dati del pixmap, salvata in un buffer 
-                                # di memoria e poi la memorizziamo nella session state
-                                img_bytes_original = io.BytesIO()
-                                img_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                                img_original.save(img_bytes_original, format='PNG')
-                                img_bytes_original.seek(0)
-                                st.session_state['original_image'] = img_bytes_original.getvalue()
-                                
-                                #andiamo a memorizzare le dimensioni del documento nella session state
-                                #per poterle usare in seguito per il disegno dei bounding box
-                                st.session_state['doc_dimensions'] = {
-                                    'width': page.rect.width,
-                                    'height': page.rect.height
-                                }
-                                
-                                #andiamo a richiamare il metodo pdfocr_tobytes per generare un PDF che incorpora i risultati OCR,
-                                #settando i vari parametri come compressione, lingua e percorso tessdata
-                                ocr_pdf_bytes = pix.pdfocr_tobytes(
-                                    compress=True,
-                                    language='eng+ita',
-                                    tessdata= os.getenv("TESSDATA_PREFIX"),
-                                )
-                                
-                                #andiamo a memorizzare il PDF OCR nella session state
-                                #in modo tale da poterlo usare in seguito per il disegno dei bounding box ed infine chiudiamo il file
-                                st.session_state['ocr_pdf_bytes'] = ocr_pdf_bytes
-                                logging.info("OCR processing completed successfully")
-                                
-                                doc.close()
-                                
-                            except Exception as ocr_e:
-                                logging.warning(f"OCR processing failed: {ocr_e}")
-                                st.session_state['ocr_pdf_bytes'] = None
-            
-                            st.session_state['extracted_data'] = analyze_invoice(file_content)
-                            st.session_state['extracted_data']["file_blob"] = file_content
-                        
-                    #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
-                    #andiamo a cancellare la più vecchia
-                        view_analysis = get_crono()
-                        if len(view_analysis) >= 10:
-                            oldest_analysis = view_analysis[-1] 
-                            oldest_id = oldest_analysis[0]
-                            oldest_temp_file_path = os.path.join(temp_files_dir, f"temp_{oldest_id}.pdf")
-                            delete_temp_file(oldest_temp_file_path)
-                            delete_oldest_analysis()
-                            logging.info("Oldest analysis deleted to maintain history size limit.")
-
-                    # rimuoviamo temporaneamente il blob dai dati estratti ed usiamo add_analysis_history per salvare 
-                    # sia i dati estratti che il file come blob, per poi ripristinare il blob
-                        file_blob = st.session_state['extracted_data'].pop("file_blob", None)
-                        add_analysis_history(st.session_state['uploaded_file_name'], st.session_state['extracted_data'], file_blob)
-                        if file_blob: 
-                            st.session_state['extracted_data']["file_blob"] = file_blob
-                            
-                        logging.info("Document analysis completed successfully.")
-                        st.session_state['analysis_source'] = 'new'
-                        st.rerun()
-                    except Exception as e:
-                        logging.error(f"Error during document analysis: {e}")
-                        st.error(current_lang["error_upload"].format(error=e))
-                        st.session_state['extracted_data'] = None
-                        logging.error("Document analysis failed.")
-
-            #se i dati estratti sono presenti usiamo la funzione per poter permettere la 
-            #modifica di essi, in caso contrario restituisce un errore di estrazione dati
-            #inoltre andiamo a salvare i dati estratti nel database, in modo tale da poterli
-            #recuperare in un secondo momento, e mostrare la cronologia delle analisi
-            if st.session_state['extracted_data']:
-                if st.session_state['analysis_source'] == 'new':
-                    st.header(current_lang["analysis_info"])
-                    edit_data(st.session_state['extracted_data'], current_lang=current_lang, key_prefix="new_upload")
-
-                else:
-                    logging.info("Skipping duplicate display for new analysis.")
-            else:
-                st.error(current_lang["data_extraction_error"])
-                logging.error("Failed to extract data from the document.")
-        else:
-            logging.warning("File upload failed.")
-            st.warning(current_lang["no_file_warning"])
-
-#se la sessione è già stata avviata e i dati estratti sono presenti,
-#andiamo a mostrare la cronologia delle analisi effettuate, in modo tale da poterle visualizzare
-#ed usando la query_params per mostrare i dati estratti in base all'get_analysis selezionata
-    if "all_history" in st.session_state and st.session_state['extracted_data']:
-        if st.session_state['analysis_source'] != 'new':
-            st.header(current_lang["analysis_info"].format(st.session_state['uploaded_file_name']))
-            edit_data(st.session_state['extracted_data'], key_prefix="history_view", show_image_with_bbox=True)
-
-    query_params = st.query_params
-
-    
-    if "get_analysis" in query_params:
-        id_get_analysis = int(query_params["get_analysis"][0])
-        dati_get_analysis = get_data_analysis(id_get_analysis)
-        if dati_get_analysis:
-            st.session_state['extracted_data'] = dati_get_analysis
-            st.session_state['uploaded_file_name'] = next(
-                (op[1] for op in view_analysis if op[0] == id_get_analysis), None
+        #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
+        st.markdown(f"### :receipt: {current_lang['upload_label']}<div style='margin-bottom: -70px;'></div>", unsafe_allow_html=True)
+        uploaded_file = st.file_uploader(
+            label=current_lang["upload_label"], 
+            type=["pdf", "jpg","png", "jpeg"],
+            key="file_uploader",
+            label_visibility="hidden",
             )
+        logging.info("Waiting for the file upload")
+
+        #inizializziamo le variabili di sessione che andremo ad utilizzare
+        if 'extracted_data' not in st.session_state:
+            st.session_state['extracted_data'] = None
+        if 'uploaded_file_name' not in st.session_state:
+            st.session_state['uploaded_file_name'] = None
+        if 'temporary_file_path' not in st.session_state:
+            st.session_state['temporary_file_path'] = None
+        if 'analysis_source' not in st.session_state:
+            st.session_state['analysis_source'] = None
+
+    #se il file è stato caricato con successo , gestiamo l'upload con la nostra funzione
+    #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto restituendo
+    #estracted_data come variabile, in caso contrario restituisce un errore durante l'aalisi del documento
+        if uploaded_file is not None:
+            #inseriamo la variabile di sessione per l'uploaded_file in modo tale da
+            #riavviare l'analisi in caso di cambio file caricato, resettando i dati estratti
+            if uploaded_file.name != st.session_state.get('uploaded_file_name'):
+            
+                st.session_state['extracted_data'] = None  
+                st.session_state['uploaded_file_name'] = uploaded_file.name
+                if st.session_state['temporary_file_path']:
+                    delete_temp_file(st.session_state['temporary_file_path'])
+                    st.session_state['temporary_file_path'] = None
+
+            st.success(current_lang["success_upload"].format(file_name=uploaded_file.name))
+            logging.info(f"File {uploaded_file.name} uploaded successfully.")
+
+            temporary_file_path, file_content = handle_file_upload(uploaded_file)
+
+            if temporary_file_path:
+                if st.session_state['extracted_data'] is None or st.session_state['temporary_file_path'] != temporary_file_path:
+                    st.session_state['temporary_file_path'] = temporary_file_path
+
+                if st.session_state['extracted_data'] is None:
+                    with st.spinner(current_lang["analyzing_document"]):
+                        logging.info("Analyzing the document...")
+                        try:
+                            with open(temporary_file_path, "rb") as f: 
+                                file_content = f.read()
+                                
+                                #andiamo, con un try-except, ad aprire il file temporaneo in formato binario,
+                                #selezioniamo la prima pagina e generiamo un pixmap senza canale alpha
+                                #per evitare problemi di OCR, in caso di errore andiamo a restituire un errore
+                                try:
+                                    doc = pymupdf.open(temporary_file_path)
+                                    page = doc[0]
+                                    pix = page.get_pixmap(alpha=False)
+                                    
+                                    #andiamo a creare un’immagine a partire dai dati del pixmap, salvata in un buffer 
+                                    # di memoria e poi la memorizziamo nella session state
+                                    img_bytes_original = io.BytesIO()
+                                    img_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                                    img_original.save(img_bytes_original, format='PNG')
+                                    img_bytes_original.seek(0)
+                                    st.session_state['original_image'] = img_bytes_original.getvalue()
+                                    
+                                    #andiamo a memorizzare le dimensioni del documento nella session state
+                                    #per poterle usare in seguito per il disegno dei bounding box
+                                    st.session_state['doc_dimensions'] = {
+                                        'width': page.rect.width,
+                                        'height': page.rect.height
+                                    }
+                                    
+                                    #andiamo a richiamare il metodo pdfocr_tobytes per generare un PDF che incorpora i risultati OCR,
+                                    #settando i vari parametri come compressione, lingua e percorso tessdata
+                                    ocr_pdf_bytes = pix.pdfocr_tobytes(
+                                        compress=True,
+                                        language='eng+ita',
+                                        tessdata= os.getenv("TESSDATA_PREFIX"),
+                                    )
+                                    
+                                    #andiamo a memorizzare il PDF OCR nella session state
+                                    #in modo tale da poterlo usare in seguito per il disegno dei bounding box ed infine chiudiamo il file
+                                    st.session_state['ocr_pdf_bytes'] = ocr_pdf_bytes
+                                    logging.info("OCR processing completed successfully")
+                                    
+                                    doc.close()
+                                    
+                                except Exception as ocr_e:
+                                    logging.warning(f"OCR processing failed: {ocr_e}")
+                                    st.session_state['ocr_pdf_bytes'] = None
+                
+                                st.session_state['extracted_data'] = analyze_invoice(file_content)
+                                st.session_state['extracted_data']["file_blob"] = file_content
+                            
+                        #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
+                        #andiamo a cancellare la più vecchia
+                            view_analysis = get_crono()
+                            if len(view_analysis) >= 10:
+                                oldest_analysis = view_analysis[-1] 
+                                oldest_id = oldest_analysis[0]
+                                oldest_temp_file_path = os.path.join(temp_files_dir, f"temp_{oldest_id}.pdf")
+                                delete_temp_file(oldest_temp_file_path)
+                                delete_oldest_analysis()
+                                logging.info("Oldest analysis deleted to maintain history size limit.")
+
+                        # rimuoviamo temporaneamente il blob dai dati estratti ed usiamo add_analysis_history per salvare 
+                        # sia i dati estratti che il file come blob, per poi ripristinare il blob
+                            file_blob = st.session_state['extracted_data'].pop("file_blob", None)
+                            add_analysis_history(st.session_state['uploaded_file_name'], st.session_state['extracted_data'], file_blob)
+                            if file_blob: 
+                                st.session_state['extracted_data']["file_blob"] = file_blob
+                                
+                            logging.info("Document analysis completed successfully.")
+                            st.session_state['analysis_source'] = 'new'
+                            st.rerun()
+                        except Exception as e:
+                            logging.error(f"Error during document analysis: {e}")
+                            st.error(current_lang["error_upload"].format(error=e))
+                            st.session_state['extracted_data'] = None
+                            logging.error("Document analysis failed.")
+
+                #se i dati estratti sono presenti usiamo la funzione per poter permettere la 
+                #modifica di essi, in caso contrario restituisce un errore di estrazione dati
+                #inoltre andiamo a salvare i dati estratti nel database, in modo tale da poterli
+                #recuperare in un secondo momento, e mostrare la cronologia delle analisi
+                if st.session_state['extracted_data']:
+                    if st.session_state['analysis_source'] == 'new':
+                        st.header(current_lang["analysis_info"])
+                        edit_data(st.session_state['extracted_data'], current_lang=current_lang, key_prefix="new_upload")
+
+                    else:
+                        logging.info("Skipping duplicate display for new analysis.")
+                else:
+                    st.error(current_lang["data_extraction_error"])
+                    logging.error("Failed to extract data from the document.")
+            else:
+                logging.warning("File upload failed.")
+                st.warning(current_lang["no_file_warning"])
+
+    #se la sessione è già stata avviata e i dati estratti sono presenti,
+    #andiamo a mostrare la cronologia delle analisi effettuate, in modo tale da poterle visualizzare
+    #ed usando la query_params per mostrare i dati estratti in base all'get_analysis selezionata
+        if "all_history" in st.session_state and st.session_state['extracted_data']:
+            if st.session_state['analysis_source'] != 'new':
+                st.header(current_lang["analysis_info"].format(st.session_state['uploaded_file_name']))
+                edit_data(st.session_state['extracted_data'], key_prefix="history_view", show_image_with_bbox=True)
+
+        query_params = st.query_params
+
+        
+        if "get_analysis" in query_params:
+            id_get_analysis = int(query_params["get_analysis"][0])
+            dati_get_analysis = get_data_analysis(id_get_analysis)
+            if dati_get_analysis:
+                st.session_state['extracted_data'] = dati_get_analysis
+                st.session_state['uploaded_file_name'] = next(
+                    (op[1] for op in view_analysis if op[0] == id_get_analysis), None
+                )
