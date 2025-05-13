@@ -5,7 +5,7 @@ import pandas as pd
 import os
 import io
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageDraw
 import streamlit.components.v1 as components
 from backend import analyze_invoice, download_button, create_annotated_image
 from database import create_database, add_analysis_history, get_crono, get_data_analysis, delete_oldest_analysis
@@ -243,11 +243,13 @@ else:
             file_content = uploaded_file.read()
             file_type = uploaded_file.type
             file_extension = uploaded_file.name.split(".")[-1].lower()
-            temporary_file_path = os.path.join(temp_files_dir, f"temp.{file_extension}")
+            is_image = file_extension in ("jpg", "jpeg", "png")
 
 #definiamo la funzione per i PDF, di solito i primi bytes contengono %PDF quindi ci basta questo
 #per assicurarci lo sia, invece per le img, potendo avere schemi differenti, non sempre è così, quindi
 #usiamo la lib Pillow e il modulo io per aprire e verificare il contenuto
+            temporary_file_path = os.path.join(temp_files_dir, "temp.pdf")
+
             def file_PDF(file_content):
                 return file_content.startswith(b'%PDF')
 
@@ -260,10 +262,40 @@ else:
                 except Exception as e:
                     logging.warning(f"Invalid image file: {e}")
                     return False
-
-#qua poniamo dei semplici blocchi if ed elif, affinchè se nelle nostre funzioni è presente il file_content
-#allora creiamo un file temporaneo in writing-binary mode con il file_content in esso, altrimenti restituisce errore
-            if file_type == "application/pdf" or file_extension == "pdf":
+            #qua poniamo una condizione per verificare se il file è un immagine ed esiste, allora andiamo a 
+            #creare un file temporaneo in pdf, in caso contrario andiamo a verificare se è un pdf
+            if is_image and file_IMG(file_content):
+                try:
+                    #andiamo a aprire il nostro file content e lo mettiamo in una variabile
+                    img = Image.open(io.BytesIO(file_content))
+                    
+                    doc = pymupdf.open()
+                    page = doc.new_page(width=img.width, height=img.height)
+                    
+                    #qua andiamo a convertire l'immagine in bytes 
+                    img_bytes = io.BytesIO()
+                    img.save(img_bytes, format="PNG")
+                    img_bytes.seek(0)
+                    
+                    #qua aggiungiamo l'immagine alla pagina PDF ed infine lo salviamo in un file temporaneo
+                    page.insert_image(page.rect, stream=img_bytes.getvalue())
+                    doc.save(temporary_file_path)
+                    doc.close()
+                    
+                    #andiamo a leggere il file temporaneo in formato binario
+                    with open(temporary_file_path, "rb") as pdf_file:
+                        pdf_content = pdf_file.read()
+                    
+                    logging.info(f"Image file {uploaded_file.name} converted to PDF and saved to temporary path.")
+                    return temporary_file_path, pdf_content
+                    
+                except Exception as e:
+                    logging.error(f"Error converting image to PDF: {e}")
+                    st.error(f"Error processing image: {e}")
+                    return None, None
+            
+            #in caso non sia un immagine andiamo a verificare se è un pdf, in caso contrario restituiamo errore
+            elif file_type == "application/pdf" or file_extension == "pdf":
                 if file_PDF(file_content):
                     with open(temporary_file_path, "wb") as temporary_file:
                         temporary_file.write(file_content)
@@ -273,18 +305,6 @@ else:
                     logging.warning(f"Invalid PDF file uploaded: {uploaded_file.name}")
                     st.error(current_lang["invalid_file_error"].format(file_type="PDF", file_name=uploaded_file.name))
                     return None, None
-
-            elif file_extension in ("jpg", "jpeg", "png"):
-                if file_IMG(file_content):
-                    with open(temporary_file_path, "wb") as temporary_file:
-                        temporary_file.write(file_content)
-                    logging.info(f"Image file {uploaded_file.name} saved to temporary path.")
-                    return temporary_file_path, file_content
-                else:
-                    logging.warning(f"Invalid {file_extension.upper()} file uploaded: {uploaded_file.name}")
-                    st.error(current_lang["invalid_file_error"].format(file_type=file_extension.upper(), file_name=uploaded_file.name))
-                    return None, None
-
             else:
                 logging.warning(f"Unsupported file type uploaded: {file_type} - {uploaded_file.name}")
                 st.error(current_lang["unsupported_file_error"].format(file_name=uploaded_file.name))
@@ -331,55 +351,132 @@ else:
         #se non è presente andiamo a cercare il file temporaneo, in caso contrario restituiamo errore
             if show_image_with_bbox:
                 try:
-                    #qua andiamo a controllare se il file blob è presente nei dati
-                    if "file_blob" in data:
-                        file_content = data["file_blob"]
-                        
-                        #qua andiamo a controllare se i poligoni sono presenti nei dati
+                    #andiamo a verificare se il file blob, i poligoni, i dati ocr e l'immagine originale sono presenti,  
+                    has_file_blob = "file_blob" in data and data["file_blob"]
+                    has_polygons = "polygons" in data and data["polygons"]
+                    has_ocr_data = 'ocr_pdf_bytes' in st.session_state and st.session_state['ocr_pdf_bytes']
+                    has_original_image = 'original_image' in st.session_state
+                    
+                    st.header(current_lang["extract_image"])
                         #se sono presenti andiamo a creare l'immagine con i bounding box richiamando la funzione
                         #create_annotated_image dal backend, altrimenti andiamo a visualizzare l'immagine originale
-                        if "polygons" in data and data["polygons"]:
-                            
-                            annotated_image = create_annotated_image(file_content, data["polygons"])
-                            
+                    if has_file_blob and has_polygons:
+                        
+                        try:
+                            annotated_image = create_annotated_image(data["file_blob"], data["polygons"])
                             if annotated_image:
-                                st.header(current_lang["extract_image"])
                                 st.image(annotated_image, width=500)
+                                logging.info("Successfully displayed annotated image with bounding boxes")
+                                display_successful = True
                             else:
-                                try:
-                                    #andiamo a controllare se il file è un pdf, lo apriamo e lo convertiamo in immagine, salviamo
+                                raise ValueError("Annotated image creation returned None")
+                        except Exception as anno_e:
+                            logging.warning(f"Failed to create annotated image: {anno_e}")
+                            display_successful = False
+                            
+                                    #andiamo a aprire il file pdf, lo convertiamo in immagine, salviamo
                                     #l'immagine in un buffer e la mostriamo, altrimenti mostriamo l'immagine originale
-                                    if file_content.startswith(b'%PDF'):
-                                        doc = pymupdf.open(stream=file_content, filetype="pdf")
-                                        pix = doc[0].get_pixmap()
-                                        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                                        img_bytes = io.BytesIO()
-                                        img.save(img_bytes, format='PNG')
-                                        img_bytes.seek(0)
-                                        st.image(img_bytes, width=500)
-                                    else:
-                                        st.image(file_content, width=500)
-                                except Exception as img_e:
-                                    st.error(f"Error displaying image: {img_e}")
-                        else:
-                            #se i poligoni non sono presenti andiamo a mostrare l'immagine originale
-                            st.image(file_content, width=500)
+                            if has_ocr_data:
+                                try:
+                                    
+                                    ocr_doc = pymupdf.open("pdf", st.session_state['ocr_pdf_bytes'])
+                                    page = ocr_doc[0]
+                                    pix = page.get_pixmap()
+                                    
+                                    img = Image.open(io.BytesIO(pix.tobytes("png")))
+                                    draw = ImageDraw.Draw(img)
+                                    
+                                    #prendiamo le dimensioni dell'immagine 
+                                    img_width, img_height = img.size
+                                    
+                                    #per ogni poligono presente andiamo a calcolare le coordinate e poi a disegnare il rettangolo
+                                    for polygon in data["polygons"]:
+                                        if "polygon" in polygon and len(polygon["polygon"]) >= 4:
+                                            points = polygon["polygon"]
+                                            x_coords = [p["x"] for p in points]
+                                            y_coords = [p["y"] for p in points]
+                                            
+                                            x0, y0 = min(x_coords), min(y_coords)
+                                            x1, y1 = max(x_coords), max(y_coords)
+                                            #andiamo a scalare le coordinate in base alla dimensione dell'immagine, normalizzando prima
+                                            #le coordinate in un range 0-1 e scalando in base alla dimensione dell'immagine
+                                            doc_width = st.session_state.get('doc_dimensions', {}).get('width', page.rect.width)
+                                            doc_height = st.session_state.get('doc_dimensions', {}).get('height', page.rect.height)
+                                            
+                                            x0_norm = x0 / doc_width
+                                            y0_norm = y0 / doc_height
+                                            x1_norm = x1 / doc_width
+                                            y1_norm = y1 / doc_height
+                                            
+                                            x0_px = x0_norm * img_width
+                                            y0_px = y0_norm * img_height
+                                            x1_px = x1_norm * img_width
+                                            y1_px = y1_norm * img_height
+                                            
+                                            #qui infine andiamo a disegnare il rettangolo usando le 
+                                            #coordinate calcolate prima dal poligono
+                                            draw.rectangle([(x0_px, y0_px), (x1_px, y1_px)], outline="red", width=3)
+                                            
+                                    #come detto prima, andiamo poi a convertire l'immagine in bytes e infine chiudiamo il file
+                                    img_bytes = io.BytesIO()
+                                    img.save(img_bytes, format='PNG')
+                                    img_bytes.seek(0)
+                                    
+                                    st.image(img_bytes, width=500)
+                                    logging.info("Successfully displayed OCR image with bounding boxes")
+                                    display_successful = True
+                                    
+                                    ocr_doc.close()
+                                    
+                                except Exception as ocr_display_e:
+                                    logging.warning(f"Failed to display OCR image with bounding boxes: {ocr_display_e}")
+                                    display_successful = False
                     else:
+                        display_successful = False
+                        
+                    #in caso in cui non sia presente l'immagine con i bounding box, andiamo a verificare se il file blob è presente
+                    #se è presente andiamo a verificare se è un pdf, in caso contrario andiamo a visualizzare l'immagine originale
+                    if not display_successful:
+                        if has_file_blob:
+                            if data["file_blob"].startswith(b'%PDF'):
+                                try:
+                                    doc = pymupdf.open(stream=data["file_blob"], filetype="pdf")
+                                    pix = doc[0].get_pixmap()
+                                    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                                    img_bytes = io.BytesIO()
+                                    img.save(img_bytes, format='PNG')
+                                    img_bytes.seek(0)
+                                    st.image(img_bytes, width=500)
+                                    doc.close()
+                                except Exception as pdf_e:
+                                    logging.error(f"Failed to render PDF for display: {pdf_e}")
+                                    st.error(f"Could not render PDF: {pdf_e}")
+                            else:
+                                st.image(data["file_blob"], width=500)
+                        elif has_original_image:
+                            #se i poligoni non sono presenti andiamo a mostrare l'immagine originale
+                            st.image(st.session_state['original_image'], width=500)
+                        else:
+                            try:
                         # andiamo a controllare se la sessione è in cronologia
                         # e se il file temporaneo è presente, altrimenti restituiamo errore
-                        if key_prefix == "history_view":
-                            history_session_key = f"history_{st.session_state['all_history']}"
-                            temporary_file_path = st.session_state[history_session_key].get('temporary_file_path')
-                        else:
-                            temporary_file_path = st.session_state.get('temporary_file_path')
-                        
-                        if not temporary_file_path:
-                            raise FileNotFoundError(current_lang["temp_path"])
+                                if key_prefix == "history_view":
+                                    history_session_key = f"history_{st.session_state['all_history']}"
+                                    temporary_file_path = st.session_state[history_session_key].get('temporary_file_path')
+                                else:
+                                    temporary_file_path = st.session_state.get('temporary_file_path')
+                                    
+                                if temporary_file_path and os.path.exists(temporary_file_path):
                         #apriamo il file temporaneo in formato binario e lo leggiamo
-                        with open(temporary_file_path, "rb") as f:
-                            file_content = f.read()
-                            st.image(file_content, width=500)
-                            
+                                    with open(temporary_file_path, "rb") as f:
+                                        file_content = f.read()
+                                        st.image(file_content, width=500)
+                                else:
+                                    st.warning("No image to display. The file may have been deleted.")
+                            except Exception as temp_file_e:
+                                logging.error(f"Failed to display temporary file: {temp_file_e}")
+                                st.error("Could not display the document image.")
+                
                 except Exception as e:
                     logging.error(f"Error displaying image with bounding boxes: {e}")
                     st.error(current_lang["rectangle_error"].format(error=e))
@@ -440,12 +537,29 @@ else:
 #andiamo a definire una funzione per eliminare il file temporaneo, in modo tale da non sovraccaricare il database
 #e mantenere solo le più recenti, in caso di errore restituisce un log di errore
     def delete_temp_file(file_path):
+        #se il file non è definito, non facciamo nulla
+        #altrimenti andiamo a dare il permesso di eliminare il file
+        if not file_path:
+            return
+            
         try:
-            if os.path.exists(file_path): 
-                os.remove(file_path)
-                logging.info(f"Temporary file {file_path} deleted.")
-            else:
-                logging.warning(f"Temporary file {file_path} does not exist.")
+            #andiamo a definire il numero di tentativi per eliminare il file e per ogni tentativo
+            #verifichiamo se il file esiste, in caso contrario non facciamo nulla
+            attempts = 3
+            for i in range(attempts):
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                        logging.info(f"Temporary file {file_path} deleted successfully.")
+                        break
+                    except PermissionError as pe:
+                        if i < attempts - 1:
+                            logging.warning(f"File {file_path} is locked. Waiting before retry #{i+1}.")
+                        else:
+                            logging.warning(f"Could not delete {file_path} after {attempts} attempts: {pe}")
+                else:
+                    #se il file non esiste, non facciamo nulla
+                    break
         except Exception as e:
             logging.error(f"Error deleting temporary file {file_path}: {e}")
 
@@ -504,6 +618,49 @@ if st.session_state.get('current_page') != 'history':
                     try:
                         with open(temporary_file_path, "rb") as f: 
                             file_content = f.read()
+                            
+                            #andiamo, con un try-except, ad aprire il file temporaneo in formato binario,
+                            #selezioniamo la prima pagina e generiamo un pixmap senza canale alpha
+                            #per evitare problemi di OCR, in caso di errore andiamo a restituire un errore
+                            try:
+                                doc = pymupdf.open(temporary_file_path)
+                                page = doc[0]
+                                pix = page.get_pixmap(alpha=False)
+                                
+                                #andiamo a creare un’immagine a partire dai dati del pixmap, salvata in un buffer 
+                                # di memoria e poi la memorizziamo nella session state
+                                img_bytes_original = io.BytesIO()
+                                img_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                                img_original.save(img_bytes_original, format='PNG')
+                                img_bytes_original.seek(0)
+                                st.session_state['original_image'] = img_bytes_original.getvalue()
+                                
+                                #andiamo a memorizzare le dimensioni del documento nella session state
+                                #per poterle usare in seguito per il disegno dei bounding box
+                                st.session_state['doc_dimensions'] = {
+                                    'width': page.rect.width,
+                                    'height': page.rect.height
+                                }
+                                
+                                #andiamo a richiamare il metodo pdfocr_tobytes per generare un PDF che incorpora i risultati OCR,
+                                #settando i vari parametri come compressione, lingua e percorso tessdata
+                                ocr_pdf_bytes = pix.pdfocr_tobytes(
+                                    compress=True,
+                                    language='eng+ita',
+                                    tessdata= os.getenv("TESSDATA_PREFIX"),
+                                )
+                                
+                                #andiamo a memorizzare il PDF OCR nella session state
+                                #in modo tale da poterlo usare in seguito per il disegno dei bounding box ed infine chiudiamo il file
+                                st.session_state['ocr_pdf_bytes'] = ocr_pdf_bytes
+                                logging.info("OCR processing completed successfully")
+                                
+                                doc.close()
+                                
+                            except Exception as ocr_e:
+                                logging.warning(f"OCR processing failed: {ocr_e}")
+                                st.session_state['ocr_pdf_bytes'] = None
+            
                             st.session_state['extracted_data'] = analyze_invoice(file_content)
                             st.session_state['extracted_data']["file_blob"] = file_content
                         
