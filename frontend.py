@@ -365,7 +365,7 @@ else:
                         try:
                             annotated_image = create_annotated_image(data["file_blob"], data["polygons"])
                             if annotated_image:
-                                st.image(annotated_image, width=500)
+                                st.image(annotated_image)
                                 logging.info("Successfully displayed annotated image with bounding boxes")
                                 display_successful = True
                             else:
@@ -422,7 +422,7 @@ else:
                                     img.save(img_bytes, format='PNG')
                                     img_bytes.seek(0)
                                     
-                                    st.image(img_bytes, width=500)
+                                    st.image(img_bytes)
                                     logging.info("Successfully displayed OCR image with bounding boxes")
                                     display_successful = True
                                     
@@ -446,16 +446,16 @@ else:
                                     img_bytes = io.BytesIO()
                                     img.save(img_bytes, format='PNG')
                                     img_bytes.seek(0)
-                                    st.image(img_bytes, width=500)
+                                    st.image(img_bytes)
                                     doc.close()
                                 except Exception as pdf_e:
                                     logging.error(f"Failed to render PDF for display: {pdf_e}")
                                     st.error(f"Could not render PDF: {pdf_e}")
                             else:
-                                st.image(data["file_blob"], width=500)
+                                st.image(data["file_blob"])
                         elif has_original_image:
                             #se i poligoni non sono presenti andiamo a mostrare l'immagine originale
-                            st.image(st.session_state['original_image'], width=500)
+                            st.image(st.session_state['original_image'])
                         else:
                             try:
                         # andiamo a controllare se la sessione è in cronologia
@@ -470,7 +470,7 @@ else:
                         #apriamo il file temporaneo in formato binario e lo leggiamo
                                     with open(temporary_file_path, "rb") as f:
                                         file_content = f.read()
-                                        st.image(file_content, width=500)
+                                        st.image(file_content)
                                 else:
                                     st.warning("No image to display. The file may have been deleted.")
                             except Exception as temp_file_e:
