@@ -9,22 +9,17 @@ from PIL import Image, ImageDraw
 import streamlit.components.v1 as components
 from backend import analyze_invoice, download_button, create_annotated_image
 from database import create_database, add_analysis_history, get_crono, get_data_analysis, delete_oldest_analysis
+from lang import translations, set_language
+from tempfile_del import delete_temp_file
+from files_ocr import handle_file_upload, temp_files_direct
 import pymupdf
 from dotenv import load_dotenv
 
 load_dotenv()
-
-#settiamo la lingua di default in italiano, se non è già presente nella sessione
-if 'language' not in st.session_state:
-    st.session_state['language'] = 'IT' 
-
-#andiamo a caricare i nostri file temporanei in una cartella specifica
-temp_files_dir = "temp_files"
-os.makedirs(temp_files_dir, exist_ok=True)
-
+set_language()
 #mettiamo la cartella temporanea in una variabile di sessione, in modo tale da non doverla creare ogni volta
 if 'temp_files_dir' not in st.session_state:
-    st.session_state.temp_files_dir = temp_files_dir
+    st.session_state.temp_files_dir = temp_files_direct()
 
 # configuriamo la nostra pagina per visualizzare tutto centralmente, ed impostando il titolo
 st.set_page_config(
@@ -32,133 +27,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="auto",
 )
-
-# andiamo a definire le traduzioni in un dizionario, in modo tale da poterle usare in base alla lingua selezionata
-translations = {
-    "IT": {
-        "login_prompt": "Effettua il login per continuare",
-        "login_button": "Log in",
-        "analysis_history": "Cronologia Analisi",
-        "analysis_info": "Informazioni sui prodotti",
-        "first_title": ":blue-background[Benvenuto nel nostro potente :blue[Azure AI] Data Extractor!]",
-        "second_title": "Analizza i tuoi documenti e lascia che il nostro AI faccia il resto 🚀",
-        "third_title": "In seguito potrai modificare i dati estratti, visualizzare il file caricato con i campi evidenziati e scaricare il file in formato JSON. ⬇️",
-        "info_textinput": "Informazioni sul Venditore",
-        "no_analysis_history": "Non ci sono analisi in cronologia.",
-        "clear_warning": "Sei sicuro di voler cancellare tutta la cronologia? Questa azione non può essere annullata.",
-        "clear_history": "🗑️ Pulisci Cronologia",
-        "confirm_clear_history": "Sì, Pulisci Cronologia",
-        "cancel_clear_history": "Annulla",
-        "clear_success": "Cronologia cancellata con successo.",
-        "view_analysis": "Apri Analisi",
-        "analysis_details": "Dettagli Analisi",
-        "close_analysis": "Chiudi",
-        "history_info" : "Non è disponibile alcuna analisi in cronologia.",
-        "logout_button": "Log out",
-        "greeting": "Ciao, **{name}**, {email}",
-        "upload_label": "Carica una Fattura o una Ricevuta",
-        "success_upload": "File {file_name} caricato con successo",
-        "extract_image": "Immagine con bounding box",
-        "error_upload": "Errore durante l'analisi del documento: {error}",
-        "json_success": "Dati aggiornati e file JSON scaricato con successo!",
-        "json_error": "Errore durante l'aggiornamento dei dati e il download: {error}",
-        "text_input": ["Nome Venditore","Indirizzo Venditore","Numero di telefono Venditore","Data","Orario","PIVA","Totale"],
-        "dataframe_columns": ["Descrizione", "Codice Prodotto", "Quantità", "PrezzoUnità", "Totale"],
-        "update_download_button": "Aggiorna e Scarica Dati",
-        "analyze_selected": "Analisi selezionata:",
-        "no_file_warning": "Non è stato caricato alcun file, seguire le istruzioni corrette",
-        "unsupported_file_error": "Tipo di file non supportato caricato: {file_name}",
-        "invalid_file_error": "File {file_type} non valido caricato: {file_name}",
-        "data_extraction_error": "Impossibile estrarre i dati dal documento.",
-        "temp_path" : "Il percorso temporaneo del file non è definito.",
-        "analyzing_document": "Analizzando il documento...",
-        "ocr_error": "Errore durante l'OCR e la generazione del PDF: {error}",
-        "rectangle_error": "Errore durante il disegno dei rettangoli: {error}",
-        "data_not_found": "I dati del file per questa analisi sono mancanti."
-    },
-    "EN": {
-        "login_prompt": "Please log in to continue",
-        "login_button": "Log in",
-        "analysis_history": "Analysis History",
-        "analysis_info": "Product Information",
-        "first_title": ":blue-background[Welcome to our powerful :blue[Azure AI] Data Extractor!]",
-        "second_title": "Analyze your documents and let our AI do the rest 🚀",
-        "third_title": "Then you can edit the extracted data, view the uploaded file with highlighted fields, and download the file in JSON format. ⬇️",
-        "info_textinput": "Vendor Information",
-        "no_analysis_history": "There are no analyses in history.",
-        "clear_warning": "Are you sure you want to clear all history? This action cannot be undone.",
-        "clear_history": "🗑️ Clear All History",
-        "confirm_clear_history": "Yes, Clear History",
-        "cancel_clear_history": "Cancel",
-        "clear_success": "History cleared successfully.",
-        "view_analysis": "Open Analysis",
-        "analysis_details": "Analysis Details",
-        "close_analysis": "Close",
-        "logout_button": "Log out",
-        "greeting": "Hello, **{name}**, {email}",
-        "upload_label": "Upload an Invoice or a Receipt",
-        "success_upload": "File {file_name} uploaded successfully",
-        "extract_image": "Image with bounding box",
-        "error_upload": "Error during document analysis: {error}",
-        "json_success": "Data updated and JSON file downloaded successfully!",
-        "json_error": "Error during the data update and download: {error}",
-        "text_input": ["Vendor Name", "Vendor Address", "Vendor Phone Number", "Date", "Time", "VAT Number", "Total"],
-        "dataframe_columns": ["Description", "Product Code", "Quantity", "Unit Price", "Total"],
-        "update_download_button": "Update and Download Data",
-        "analyze_selected": "Analyze selected:",
-        "no_file_warning": "There's no file uploaded, please follow the right instructions",
-        "unsupported_file_error": "Unsupported file type uploaded: {file_name}",
-        "invalid_file_error": "Invalid {file_type} file uploaded: {file_name}",
-        "data_extraction_error": "Failed to extract data from the document.",
-        "temp_path" : "The temporary file path is not defined.",
-        "analyzing_document": "Analyzing the document...",
-        "ocr_error": "Error during OCR and PDF generation: {error}",
-        "rectangle_error": "Error during rectangle drawing: {error}",
-        "data_not_found": "File data for this analysis is missing."
-    },
-    "ES": {
-        "login_prompt": "Inicia sesión para continuar",
-        "login_button": "Iniciar sesión",
-        "analysis_history": "Historial de análisis",
-        "analysis_info": "Información sobre los productos",
-        "first_title": ":blue-background[Bienvenido a nuestro potente :blue[Azure AI] Data Extractor!]",
-        "second_title": "Analiza tus documentos y deja que nuestra IA haga el resto 🚀",
-        "third_title": "Luego podrás editar los datos extraídos, ver el archivo cargado con los campos resaltados y descargar el archivo en formato JSON.⬇️",
-        "info_textinput": "Informaciòn del Vendedor",
-        "no_analysis_history": "No hay análisis en el historial.",
-        "clear_warning": "¿Estás seguro de que deseas limpiar todo el historial? Esta acción no se puede deshacer.",
-        "clear_history": "🗑️ Limpiar todo el historial",
-        "confirm_clear_history": "Sí, limpiar historial",
-        "cancel_clear_history": "Cancelar",
-        "clear_success": "Historial limpiado con éxito.",
-        "view_analysis": "Abrir análisis",
-        "analysis_details": "Detalles del análisis",
-        "close_analysis": "Cerrar",
-        "history_info" : "No hay análisis disponibles en el historial.",
-        "logout_button": "Cerrar sesión",
-        "greeting": "Hola, **{name}**, {email}",
-        "upload_label": "Cargar una factura o un recibo",
-        "success_upload": "Archivo {file_name} cargado con éxito",
-        "extract_image": "Imagen con bounding box",
-        "error_upload": "Error al analizar el documento: {error}",
-        "json_success": "Datos actualizados y archivo JSON descargado con éxito!",
-        "json_error": "Error al actualizar los datos y descargar: {error}",
-        "text_input": ["Nombre del vendedor", "Dirección del vendedor", "Número de teléfono del vendedor", "Fecha", "Hora", "Número de IVA", "Total"],
-        "dataframe_columns": ["Descripción", "Código de producto", "Cantidad", "Precio unitario", "Total"],
-        "update_download_button": "Actualizar y descargar datos",
-        "analyze_selected": "Análisis seleccionado:",
-        "no_file_warning": "No se ha cargado ningún archivo, siga las instrucciones correctas",
-        "unsupported_file_error": "Tipo de archivo no compatible cargado: {file_name}",
-        "invalid_file_error": "Archivo {file_type} no válido cargado: {file_name}",
-        "data_extraction_error": "No se pudieron extraer datos del documento.",
-        "temp_path" : "La ruta del archivo temporal no está definida.",
-        "analyzing_document": "Analizando el documento...",
-        "ocr_error": "Error durante el OCR y la generación del PDF: {error}",
-        "rectangle_error": "Error al dibujar los rectángulos: {error}",
-        "data_not_found": "Los datos del archivo para este análisis faltan."
-
-    }
-}
 
 #connettiamoci al nostro db andando a prendere la conn ed il cursore presente nel nostro file database
 create_database()
@@ -234,85 +102,6 @@ else:
                 st.markdown("")
             show_navigation(page_prefix="dashboard")
                     
-
-#la funzione per gestire il file che viene caricato, se non è vuota allora il file
-#viene letto, andando a verificare però che il file sia un file pdf, ed in caso creando
-#un file temporaneo per esso, in caso contrario restituisce errore, con qualche log pure
-    def handle_file_upload(uploaded_file):
-        if uploaded_file is not None:
-            file_content = uploaded_file.read()
-            file_type = uploaded_file.type
-            file_extension = uploaded_file.name.split(".")[-1].lower()
-            is_image = file_extension in ("jpg", "jpeg", "png")
-
-#definiamo la funzione per i PDF, di solito i primi bytes contengono %PDF quindi ci basta questo
-#per assicurarci lo sia, invece per le img, potendo avere schemi differenti, non sempre è così, quindi
-#usiamo la lib Pillow e il modulo io per aprire e verificare il contenuto
-            temporary_file_path = os.path.join(temp_files_dir, "temp.pdf")
-
-            def file_PDF(file_content):
-                return file_content.startswith(b'%PDF')
-
-            def file_IMG(file_content):
-                try:
-
-                    img = Image.open(io.BytesIO(file_content))
-                    img.verify() 
-                    return True
-                except Exception as e:
-                    logging.warning(f"Invalid image file: {e}")
-                    return False
-            #qua poniamo una condizione per verificare se il file è un immagine ed esiste, allora andiamo a 
-            #creare un file temporaneo in pdf, in caso contrario andiamo a verificare se è un pdf
-            if is_image and file_IMG(file_content):
-                try:
-                    #andiamo a aprire il nostro file content e lo mettiamo in una variabile
-                    img = Image.open(io.BytesIO(file_content))
-                    
-                    doc = pymupdf.open()
-                    page = doc.new_page(width=img.width, height=img.height)
-                    
-                    #qua andiamo a convertire l'immagine in bytes 
-                    img_bytes = io.BytesIO()
-                    img.save(img_bytes, format="PNG")
-                    img_bytes.seek(0)
-                    
-                    #qua aggiungiamo l'immagine alla pagina PDF ed infine lo salviamo in un file temporaneo
-                    page.insert_image(page.rect, stream=img_bytes.getvalue())
-                    doc.save(temporary_file_path)
-                    doc.close()
-                    
-                    #andiamo a leggere il file temporaneo in formato binario
-                    with open(temporary_file_path, "rb") as pdf_file:
-                        pdf_content = pdf_file.read()
-                    
-                    logging.info(f"Image file {uploaded_file.name} converted to PDF and saved to temporary path.")
-                    return temporary_file_path, pdf_content
-                    
-                except Exception as e:
-                    logging.error(f"Error converting image to PDF: {e}")
-                    st.error(f"Error processing image: {e}")
-                    return None, None
-            
-            #in caso non sia un immagine andiamo a verificare se è un pdf, in caso contrario restituiamo errore
-            elif file_type == "application/pdf" or file_extension == "pdf":
-                if file_PDF(file_content):
-                    with open(temporary_file_path, "wb") as temporary_file:
-                        temporary_file.write(file_content)
-                    logging.info(f"PDF file {uploaded_file.name} saved to temporary path.")
-                    return temporary_file_path, file_content
-                else:
-                    logging.warning(f"Invalid PDF file uploaded: {uploaded_file.name}")
-                    st.error(current_lang["invalid_file_error"].format(file_type="PDF", file_name=uploaded_file.name))
-                    return None, None
-            else:
-                logging.warning(f"Unsupported file type uploaded: {file_type} - {uploaded_file.name}")
-                st.error(current_lang["unsupported_file_error"].format(file_name=uploaded_file.name))
-                return None, None
-        else:
-            logging.warning("There's no file uploaded, please follow the right instructions")
-            st.warning(current_lang["no_file_warning"])
-            return None, None
 
 #definiamo una funziona avente come parametro i nostri dati
     def edit_data(data, current_lang, key_prefix="", show_image_with_bbox=True):
@@ -534,35 +323,6 @@ else:
             st.success(current_lang["json_success"])
         return data_it
 
-#andiamo a definire una funzione per eliminare il file temporaneo, in modo tale da non sovraccaricare il database
-#e mantenere solo le più recenti, in caso di errore restituisce un log di errore
-    def delete_temp_file(file_path):
-        #se il file non è definito, non facciamo nulla
-        #altrimenti andiamo a dare il permesso di eliminare il file
-        if not file_path:
-            return
-            
-        try:
-            #andiamo a definire il numero di tentativi per eliminare il file e per ogni tentativo
-            #verifichiamo se il file esiste, in caso contrario non facciamo nulla
-            attempts = 3
-            for i in range(attempts):
-                if os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                        logging.info(f"Temporary file {file_path} deleted successfully.")
-                        break
-                    except PermissionError as pe:
-                        if i < attempts - 1:
-                            logging.warning(f"File {file_path} is locked. Waiting before retry #{i+1}.")
-                        else:
-                            logging.warning(f"Could not delete {file_path} after {attempts} attempts: {pe}")
-                else:
-                    #se il file non esiste, non facciamo nulla
-                    break
-        except Exception as e:
-            logging.error(f"Error deleting temporary file {file_path}: {e}")
-
     if st.session_state.get('current_page') != 'history':
         st.markdown(f"<h1 style='text-align: center;'>{current_lang['first_title'].replace(':blue[Azure AI]', '<span style=\"color:blue;\">Azure AI</span>').replace(':blue-background[', '<span style=\"background-color:#b3d7fe;\">').replace(']', '</span>')}</h1>", unsafe_allow_html=True)
         st.markdown(f"<h3 style='text-align: center; font-weight: bold;'>{current_lang['second_title']}</h3>", unsafe_allow_html=True)
@@ -670,7 +430,7 @@ else:
                             if len(view_analysis) >= 10:
                                 oldest_analysis = view_analysis[-1] 
                                 oldest_id = oldest_analysis[0]
-                                oldest_temp_file_path = os.path.join(temp_files_dir, f"temp_{oldest_id}.pdf")
+                                oldest_temp_file_path = os.path.join(temp_files_direct(), f"temp_{oldest_id}.pdf")
                                 delete_temp_file(oldest_temp_file_path)
                                 delete_oldest_analysis()
                                 logging.info("Oldest analysis deleted to maintain history size limit.")
