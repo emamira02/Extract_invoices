@@ -77,7 +77,7 @@ else:
     with col3:
         #usiamo il decoratore @st.dialog per creare un popup che ci permetta di visualizzare il messaggio di avviso
         #e di confermare l'azione di cancellazione della cronologia
-        @st.dialog(title=current_lang.get("clear_history_title", "Clear History"))
+        @st.dialog(title=current_lang.get("clear_history", "Clear History"))
         #definiamo una funzione per confermare la cancellazione della cronologia, mediante un pulsante cancelliamo l'intera cronologia presente
         #nel database, chiedendo conferma all'utente prima di procedere
         #e mostrando un messaggio di successo o errore a seconda dell'esito dell'operazione
