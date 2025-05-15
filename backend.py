@@ -229,14 +229,14 @@ def create_annotated_image(file_content, polygons):
         # definiamo un dict per i colori dei vari campi
         # in modo da poterli cambiare in base al campo
         colors = {
-            "VendorName": "red",
-            "VendorAddress": "blue",
-            "MerchantPhoneNumber": "green",
+            "VendorName": "#e10050",
+            "VendorAddress": "#0000ff",
+            "MerchantPhoneNumber": "#ff0000",
             "InvoiceDate": "orange",
-            "TransactionTime": "purple",
-            "VendorTaxId": "brown",
-            "InvoiceTotal": "grey",
-            "AmountDue": "red"
+            "TransactionTime": "#ae00c6",
+            "VendorTaxId": "#00ffef",
+            "InvoiceTotal": "#aeff76",
+            "AmountDue": "#ff0000"
         }
         
         draw = ImageDraw.Draw(image)
@@ -253,7 +253,7 @@ def create_annotated_image(file_content, polygons):
             
             # segniamo i punti usando le coordinate calcolate, imponiamo un margine
             # per il bounding box in modo da non farlo coincidere con i punti
-            margin = 5
+            margin = 3
             min_x = min(p[0] for p in points) - margin
             min_y = min(p[1] for p in points) - margin
             max_x = max(p[0] for p in points) + margin
@@ -261,7 +261,7 @@ def create_annotated_image(file_content, polygons):
             
             #qui invece andiamo a disegnare il bounding box
             #e a colorarlo in base al campo
-            color = colors.get(field_name.split(" ")[0] if " " in field_name else field_name, "red")
+            color = colors.get(field_name.split(" ")[0] if " " in field_name else field_name, "purple")
             draw.rectangle([min_x, min_y, max_x, max_y], outline=color, width=2)
         
         #convertiamo l'immagine in un oggetto bytes
