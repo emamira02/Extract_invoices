@@ -5,7 +5,7 @@ import pandas as pd
 import os
 import io
 from io import BytesIO
-from PIL import Image, ImageDraw
+from PIL import Image
 import streamlit.components.v1 as components
 from backend import analyze_invoice, download_button, create_annotated_image
 from database import create_database, add_analysis_history, get_crono, get_data_analysis, delete_oldest_analysis
@@ -69,9 +69,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-
 def show_navigation(page_prefix=""):
-    """Display consistent navigation buttons in the sidebar."""
     if st.button(":house:**Homepage**", use_container_width=True, key=f"{page_prefix}_dashboard_btn"):
         st.session_state['current_page'] = 'dashboard'
         st.switch_page("frontend.py")
@@ -143,7 +141,6 @@ else:
                     #andiamo a verificare se il file blob, i poligoni, i dati ocr e l'immagine originale sono presenti,  
                     has_file_blob = "file_blob" in data and data["file_blob"]
                     has_polygons = "polygons" in data and data["polygons"]
-                    has_ocr_data = 'ocr_pdf_bytes' in st.session_state and st.session_state['ocr_pdf_bytes']
                     has_original_image = 'original_image' in st.session_state
                     
                     st.header(current_lang["extract_image"])
@@ -162,64 +159,7 @@ else:
                         except Exception as anno_e:
                             logging.warning(f"Failed to create annotated image: {anno_e}")
                             display_successful = False
-                            
-                                    #andiamo a aprire il file pdf, lo convertiamo in immagine, salviamo
-                                    #l'immagine in un buffer e la mostriamo, altrimenti mostriamo l'immagine originale
-                            if has_ocr_data:
-                                try:
-                                    
-                                    ocr_doc = pymupdf.open("pdf", st.session_state['ocr_pdf_bytes'])
-                                    page = ocr_doc[0]
-                                    pix = page.get_pixmap()
-                                    
-                                    img = Image.open(io.BytesIO(pix.tobytes("png")))
-                                    draw = ImageDraw.Draw(img)
-                                    
-                                    #prendiamo le dimensioni dell'immagine 
-                                    img_width, img_height = img.size
-                                    
-                                    #per ogni poligono presente andiamo a calcolare le coordinate e poi a disegnare il rettangolo
-                                    for polygon in data["polygons"]:
-                                        if "polygon" in polygon and len(polygon["polygon"]) >= 4:
-                                            points = polygon["polygon"]
-                                            x_coords = [p["x"] for p in points]
-                                            y_coords = [p["y"] for p in points]
-                                            
-                                            x0, y0 = min(x_coords), min(y_coords)
-                                            x1, y1 = max(x_coords), max(y_coords)
-                                            #andiamo a scalare le coordinate in base alla dimensione dell'immagine, normalizzando prima
-                                            #le coordinate in un range 0-1 e scalando in base alla dimensione dell'immagine
-                                            doc_width = st.session_state.get('doc_dimensions', {}).get('width', page.rect.width)
-                                            doc_height = st.session_state.get('doc_dimensions', {}).get('height', page.rect.height)
-                                            
-                                            x0_norm = x0 / doc_width
-                                            y0_norm = y0 / doc_height
-                                            x1_norm = x1 / doc_width
-                                            y1_norm = y1 / doc_height
-                                            
-                                            x0_px = x0_norm * img_width
-                                            y0_px = y0_norm * img_height
-                                            x1_px = x1_norm * img_width
-                                            y1_px = y1_norm * img_height
-                                            
-                                            #qui infine andiamo a disegnare il rettangolo usando le 
-                                            #coordinate calcolate prima dal poligono
-                                            draw.rectangle([(x0_px, y0_px), (x1_px, y1_px)], outline="red", width=3)
-                                            
-                                    #come detto prima, andiamo poi a convertire l'immagine in bytes e infine chiudiamo il file
-                                    img_bytes = io.BytesIO()
-                                    img.save(img_bytes, format='PNG')
-                                    img_bytes.seek(0)
-                                    
-                                    st.image(img_bytes)
-                                    logging.info("Successfully displayed OCR image with bounding boxes")
-                                    display_successful = True
-                                    
-                                    ocr_doc.close()
-                                    
-                                except Exception as ocr_display_e:
-                                    logging.warning(f"Failed to display OCR image with bounding boxes: {ocr_display_e}")
-                                    display_successful = False
+
                     else:
                         display_successful = False
                         
