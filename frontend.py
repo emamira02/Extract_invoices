@@ -7,11 +7,12 @@ import io
 from io import BytesIO
 from PIL import Image
 import streamlit.components.v1 as components
-from backend import analyze_invoice, download_button, create_annotated_image
-from database import create_database, add_analysis_history, get_crono, get_data_analysis, delete_oldest_analysis
-from lang import translations, set_language
-from tempfile_del import delete_temp_file
-from files_ocr import handle_file_upload, temp_files_direct
+from backend.analyze_func import *
+from backend.database import *
+from backend.download import download_button
+from backend.lang import translations, set_language
+from backend.tempfile_del import delete_temp_file
+from backend.files_ocr import handle_file_upload, temp_files_direct
 import pymupdf
 from dotenv import load_dotenv
 

@@ -4,7 +4,7 @@ import pymupdf
 import io
 import os
 import streamlit as st
-from lang import set_language
+from backend.lang import set_language
 
 
 
