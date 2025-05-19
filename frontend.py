@@ -272,11 +272,12 @@ else:
 
         #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
         st.markdown(f"### :receipt: {current_lang['upload_label']}<div style='margin-bottom: -70px;'></div>", unsafe_allow_html=True)
-        uploaded_file = st.file_uploader(
+        uploaded_files = st.file_uploader(
             label=current_lang["upload_label"], 
             type=["pdf", "jpg","png", "jpeg"],
             key="file_uploader",
             label_visibility="hidden",
+            accept_multiple_files=True
             )
         logging.info("Waiting for the file upload")
 
@@ -289,35 +290,25 @@ else:
             st.session_state['temporary_file_path'] = None
         if 'analysis_source' not in st.session_state:
             st.session_state['analysis_source'] = None
+        if 'uploaded_files_data' not in st.session_state:
+            st.session_state['uploaded_files_data'] = {}
 
-    #se il file è stato caricato con successo , gestiamo l'upload con la nostra funzione
-    #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto restituendo
-    #estracted_data come variabile, in caso contrario restituisce un errore durante l'aalisi del documento
-        if uploaded_file is not None:
-            #inseriamo la variabile di sessione per l'uploaded_file in modo tale da
-            #riavviare l'analisi in caso di cambio file caricato, resettando i dati estratti
-            if uploaded_file.name != st.session_state.get('uploaded_file_name'):
-            
-                st.session_state['extracted_data'] = None  
-                st.session_state['uploaded_file_name'] = uploaded_file.name
-                if st.session_state['temporary_file_path']:
-                    delete_temp_file(st.session_state['temporary_file_path'])
-                    st.session_state['temporary_file_path'] = None
+    #se uploaded_files è presente allora per ciascun file in esso se il nome è già presente nella session
+    #allora non analizza e passa alla prossima, gestiamo l'upload con la nostra funzione
+    #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto, in caso non sia stato
+    #possibile analizzare il file, restituisce un errore
+        if uploaded_files:
+            for uploaded_file in uploaded_files:
+                if uploaded_file.name in st.session_state['uploaded_files_data']:
+                    st.info(current_lang["file_already_analyzed"])
+                    continue
 
-            st.success(current_lang["success_upload"].format(file_name=uploaded_file.name))
-            logging.info(f"File {uploaded_file.name} uploaded successfully.")
+                temporary_file_path, file_content = handle_file_upload(uploaded_file)
 
-            temporary_file_path, file_content = handle_file_upload(uploaded_file)
-
-            if temporary_file_path:
-                if st.session_state['extracted_data'] is None or st.session_state['temporary_file_path'] != temporary_file_path:
-                    st.session_state['temporary_file_path'] = temporary_file_path
-
-                if st.session_state['extracted_data'] is None:
+                if temporary_file_path:
                     with st.spinner(current_lang["analyzing_document"]):
-                        logging.info("Analyzing the document...")
                         try:
-                            with open(temporary_file_path, "rb") as f: 
+                            with open(temporary_file_path, "rb") as f:
                                 file_content = f.read()
                                 
                                 #andiamo, con un try-except, ad aprire il file temporaneo in formato binario,
@@ -362,61 +353,66 @@ else:
                                     logging.warning(f"OCR processing failed: {ocr_e}")
                                     st.session_state['ocr_pdf_bytes'] = None
                 
-                                st.session_state['extracted_data'] = analyze_invoice(file_content)
-                                st.session_state['extracted_data']["file_blob"] = file_content
-                            
+                                analyzed_data = analyze_invoice(file_content)
+                                analyzed_data["file_blob"] = file_content
+                                analyzed_data["temporary_file_path"] = temporary_file_path
+                                
+                                #andiamo a inserire i nostri data analizzati ed estratti nella nostra session
+                                st.session_state['uploaded_files_data'][uploaded_file.name] = analyzed_data
+                                
                         #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
                         #andiamo a cancellare la più vecchia
-                            view_analysis = get_crono()
-                            if len(view_analysis) >= 10:
-                                oldest_analysis = view_analysis[-1] 
-                                oldest_id = oldest_analysis[0]
-                                oldest_temp_file_path = os.path.join(temp_files_direct(), f"temp_{oldest_id}.pdf")
-                                delete_temp_file(oldest_temp_file_path)
-                                delete_oldest_analysis()
-                                logging.info("Oldest analysis deleted to maintain history size limit.")
+                                view_analysis = get_crono()
+                                if len(view_analysis) >= 10:
+                                    oldest_analysis = view_analysis[-1] 
+                                    oldest_id = oldest_analysis[0]
+                                    oldest_temp_file_path = os.path.join(temp_files_direct(), f"temp_{oldest_id}.pdf")
+                                    delete_temp_file(oldest_temp_file_path)
+                                    delete_oldest_analysis()
 
                         # rimuoviamo temporaneamente il blob dai dati estratti ed usiamo add_analysis_history per salvare 
                         # sia i dati estratti che il file come blob, per poi ripristinare il blob
-                            file_blob = st.session_state['extracted_data'].pop("file_blob", None)
-                            add_analysis_history(st.session_state['uploaded_file_name'], st.session_state['extracted_data'], file_blob)
-                            if file_blob: 
-                                st.session_state['extracted_data']["file_blob"] = file_blob
+                                file_blob = analyzed_data.pop("file_blob", None)
+                                add_analysis_history(uploaded_file.name, analyzed_data, file_blob)
+                                if file_blob:
+                                    analyzed_data["file_blob"] = file_blob
+                                    
+                                st.success(f"Analysis completed for {uploaded_file.name}")
+                                logging.info(f"Document analysis completed successfully for {uploaded_file.name}")
                                 
-                            logging.info("Document analysis completed successfully.")
-                            st.session_state['analysis_source'] = 'new'
-                            st.rerun()
                         except Exception as e:
                             logging.error(f"Error during document analysis: {e}")
                             st.error(current_lang["error_upload"].format(error=e))
                             st.session_state['extracted_data'] = None
-                            logging.error("Document analysis failed.")
+                            break
 
+                #per ogni file presente in sessione, usiamo un expander per la visualizzazione e
                 #se i dati estratti sono presenti usiamo la funzione per poter permettere la 
                 #modifica di essi, in caso contrario restituisce un errore di estrazione dati
                 #inoltre andiamo a salvare i dati estratti nel database, in modo tale da poterli
                 #recuperare in un secondo momento, e mostrare la cronologia delle analisi
-                if st.session_state['extracted_data']:
-                    if st.session_state['analysis_source'] == 'new':
-                        st.header(current_lang["analysis_info"])
-                        edit_data(st.session_state['extracted_data'], current_lang=current_lang, key_prefix="new_upload")
-
-                    else:
-                        logging.info("Skipping duplicate display for new analysis.")
-                else:
-                    st.error(current_lang["data_extraction_error"])
-                    logging.error("Failed to extract data from the document.")
+            for filename, file_data in st.session_state['uploaded_files_data'].items():
+                with st.expander(f"**Results** for **{filename}**"):
+                    edit_data(
+                        file_data,
+                        current_lang=current_lang,
+                        key_prefix=f"file_{filename}",
+                        show_image_with_bbox=True
+                    )
             else:
-                logging.warning("File upload failed.")
-                st.warning(current_lang["no_file_warning"])
+                st.error(current_lang["data_extraction_error"])
+                logging.error("Failed to extract data from the document.")
+        else:
+            logging.info("No files uploaded.")
+            st.info(current_lang["no_file_warning"])
 
-    #se la sessione è già stata avviata e i dati estratti sono presenti,
-    #andiamo a mostrare la cronologia delle analisi effettuate, in modo tale da poterle visualizzare
-    #ed usando la query_params per mostrare i dati estratti in base all'get_analysis selezionata
-        if "all_history" in st.session_state and st.session_state['extracted_data']:
-            if st.session_state['analysis_source'] != 'new':
-                st.header(current_lang["analysis_info"].format(st.session_state['uploaded_file_name']))
-                edit_data(st.session_state['extracted_data'], key_prefix="history_view", show_image_with_bbox=True)
+#se la sessione è già stata avviata e i dati estratti sono presenti,
+#andiamo a mostrare la cronologia delle analisi effettuate, in modo tale da poterle visualizzare
+#ed usando la query_params per mostrare i dati estratti in base all'get_analysis selezionata
+    if "all_history" in st.session_state and st.session_state['extracted_data']:
+        if st.session_state['analysis_source'] != 'new':
+            st.header(current_lang["analysis_info"].format(st.session_state['uploaded_file_name']))
+            edit_data(st.session_state['extracted_data'], key_prefix="history_view", show_image_with_bbox=True)
 
         query_params = st.query_params
 
