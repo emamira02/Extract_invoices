@@ -43,13 +43,16 @@ with st.sidebar:
             ""
             st.title(":globe_with_meridians:**Dashboard**")
         with col2:
+            #andiamo a selezionare la lingua, in modo tale da poterla cambiare in base alla selezione dell'utente
+            if 'language' not in st.session_state:
+                st.session_state.language = 'IT'
+            
             lang = st.selectbox(
                 "A", 
                 ["IT", "EN", "ES"], 
                 label_visibility="hidden",
-                key="dashboard_lang_selector",
-                index=["IT", "EN", "ES"].index(st.session_state['language']),  
-                on_change=lambda: st.session_state.update(language=st.session_state.dashboard_lang_selector) 
+                index=["IT", "EN", "ES"].index(st.session_state['language']),
+                key="dashboard_lang_selector"
             )
             #andiamo a salvare la lingua selezionata nella sessione, in modo tale da non doverla cambiare ogni volta
             if lang != st.session_state['language']:
@@ -297,6 +300,8 @@ else:
     #allora non analizza e passa alla prossima, gestiamo l'upload con la nostra funzione
     #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto, in caso non sia stato
     #possibile analizzare il file, restituisce un errore
+
+        col_home1, col_home2 = st.columns(2, gap="medium")
         if uploaded_files:
             for uploaded_file in uploaded_files:
                 if uploaded_file.name in st.session_state['uploaded_files_data']:
