@@ -90,3 +90,38 @@ def handle_file_upload(uploaded_file):
         logging.warning("There's no file uploaded, please follow the right instructions")
         st.warning(current_lang["no_file_warning"])
         return None, None
+    
+def try_ocr(temporary_file_path):
+    doc = pymupdf.open(temporary_file_path)
+    page = doc[0]
+    pix = page.get_pixmap(alpha=False)
+    
+    #andiamo a creare un’immagine a partire dai dati del pixmap, salvata in un buffer 
+    # di memoria e poi la memorizziamo nella session state
+    img_bytes_original = io.BytesIO()
+    img_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+    img_original.save(img_bytes_original, format='PNG')
+    img_bytes_original.seek(0)
+    st.session_state['original_image'] = img_bytes_original.getvalue()
+    
+    #andiamo a memorizzare le dimensioni del documento nella session state
+    #per poterle usare in seguito per il disegno dei bounding box
+    st.session_state['doc_dimensions'] = {
+    'width': page.rect.width,
+    'height': page.rect.height
+    }
+    
+    #andiamo a richiamare il metodo pdfocr_tobytes per generare un PDF che incorpora i risultati OCR,
+    #settando i vari parametri come compressione, lingua e percorso tessdata
+    ocr_pdf_bytes = pix.pdfocr_tobytes(
+    compress=True,
+    language='eng+ita',
+    tessdata= os.getenv("TESSDATA_PREFIX"),
+    )
+    
+    #andiamo a memorizzare il PDF OCR nella session state
+    #in modo tale da poterlo usare in seguito per il disegno dei bounding box ed infine chiudiamo il file
+    st.session_state['ocr_pdf_bytes'] = ocr_pdf_bytes
+    logging.info("OCR processing completed successfully")
+    
+    doc.close()
