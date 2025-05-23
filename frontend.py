@@ -305,10 +305,11 @@ else:
         if uploaded_files:
             for uploaded_file in uploaded_files:
                 if uploaded_file.name in st.session_state['uploaded_files_data']:
-                    st.info(current_lang["file_already_analyzed"])
+                    st.info(current_lang["file_already_analyzed"].format(file_name=uploaded_file.name))
                     continue
 
                 temporary_file_path, file_content = handle_file_upload(uploaded_file)
+                st.success(f"{current_lang['success_upload'].format(file_name=uploaded_file.name)}")
 
                 if temporary_file_path:
                     with st.spinner(current_lang["analyzing_document"]):
@@ -349,7 +350,7 @@ else:
                                 if file_blob:
                                     analyzed_data["file_blob"] = file_blob
                                     
-                                st.success(f"Analysis completed for {uploaded_file.name}")
+                                st.success(f"{current_lang["analysis_success"]} {uploaded_file.name}")
                                 logging.info(f"Document analysis completed successfully for {uploaded_file.name}")
                                 
                         except Exception as e:
@@ -363,37 +364,35 @@ else:
                 #modifica di essi, in caso contrario restituisce un errore di estrazione dati
                 #inoltre andiamo a salvare i dati estratti nel database, in modo tale da poterli
                 #recuperare in un secondo momento, e mostrare la cronologia delle analisi
-            for filename, file_data in st.session_state['uploaded_files_data'].items():
-                with st.expander(f"**Results** for **{filename}**"):
-                    edit_data(
-                        file_data,
-                        current_lang=current_lang,
-                        key_prefix=f"file_{filename}",
-                        show_image_with_bbox=True
-                    )
+            uploaded_files_list = list(st.session_state['uploaded_files_data'].items())
+            if uploaded_files_list:
+                col_left, col_right = st.columns(2, gap="medium")
+                #mettiamo il primo file nella colonna di sinistra, expander aperto, tutti gli altri files
+                #nella colonna di destra, expander chiuso
+                filename_first, file_data_first = uploaded_files_list[0]
+                with col_left:
+                    with st.expander(f"**{current_lang["analysis_details"]}** -- {filename_first}", expanded=True):
+                        st.header(f"**{current_lang["analysis_info"]}**")
+                        edit_data(
+                            file_data_first,
+                            current_lang=current_lang,
+                            key_prefix=f"file_{filename_first}",
+                            show_image_with_bbox=True
+                        )
+                with col_right:
+                    for filename, file_data in uploaded_files_list[1:]:
+                        with st.expander(f"**{current_lang["analysis_details"]}** -- {filename}", expanded=False):
+                            st.header(f"**{current_lang["analysis_info"]}**")
+                            ""
+                            edit_data(
+                                file_data,
+                                current_lang=current_lang,
+                                key_prefix=f"file_{filename}",
+                                show_image_with_bbox=True
+                            )
             else:
                 st.error(current_lang["data_extraction_error"])
                 logging.error("Failed to extract data from the document.")
         else:
             logging.info("No files uploaded.")
             st.info(current_lang["no_file_warning"])
-
-#se la sessione è già stata avviata e i dati estratti sono presenti,
-#andiamo a mostrare la cronologia delle analisi effettuate, in modo tale da poterle visualizzare
-#ed usando la query_params per mostrare i dati estratti in base all'get_analysis selezionata
-    if "all_history" in st.session_state and st.session_state['extracted_data']:
-        if st.session_state['analysis_source'] != 'new':
-            st.header(current_lang["analysis_info"].format(st.session_state['uploaded_file_name']))
-            edit_data(st.session_state['extracted_data'], key_prefix="history_view", show_image_with_bbox=True)
-
-        query_params = st.query_params
-
-        
-        if "get_analysis" in query_params:
-            id_get_analysis = int(query_params["get_analysis"][0])
-            dati_get_analysis = get_data_analysis(id_get_analysis)
-            if dati_get_analysis:
-                st.session_state['extracted_data'] = dati_get_analysis
-                st.session_state['uploaded_file_name'] = next(
-                    (op[1] for op in view_analysis if op[0] == id_get_analysis), None
-                )
