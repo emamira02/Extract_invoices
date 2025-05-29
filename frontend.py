@@ -249,22 +249,24 @@ else:
                 buff.write(json_string.encode('utf-8'))
                 buff.seek(0)
 
+                
                 if st.session_state.get("analysis_source") == "history":
-                    file_name = f"{st.session_state.get('selected_analysis_name')}.json"
-                else:
                     file_name = f"{st.session_state.get('uploaded_file_name')}.json"
+                else:
+                    base_filename = key_prefix.replace("file_", "") if key_prefix.startswith("file_") else st.session_state.get('uploaded_file_name', 'extracted_data')
+                    file_name = f"{base_filename}.json"
                 download_html = download_button(buff.getvalue(), file_name) 
                 components.html(
                     download_html,
                     height=0,
                 )
-                logging.info(f"JSON file {st.session_state['uploaded_file_name']}.json downloaded successfully.")
-                st.rerun()
+                logging.info(f"JSON file {file_name} downloaded successfully.")
 
             except Exception as e:
                 logging.error(f"Error during the data update and download: {e}")
                 st.error(current_lang["json_error"].format(error=e))
-            st.success(current_lang["json_success"])
+            
+            st.rerun()
         return data_it
 
     if st.session_state.get('current_page') != 'history':
@@ -274,11 +276,41 @@ else:
         st.markdown("---")
 
         #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
-        st.markdown(f"### :receipt: {current_lang['upload_label']}<div style='margin-bottom: -70px;'></div>", unsafe_allow_html=True)
+        if st.session_state['language'] == "IT":
+            col_fileupload, col_filedelete = st.columns([14, 1], gap="small")
+        elif st.session_state['language'] == "EN":
+            col_fileupload, col_filedelete = st.columns([13, 1], gap="small")
+        elif st.session_state['language'] == "ES":
+            col_fileupload, col_filedelete = st.columns([13, 1], gap="small")
+
+        with col_fileupload:
+            st.markdown(
+            f"### :receipt: {current_lang['upload_label']}",
+            unsafe_allow_html=True
+            )
+        with col_filedelete:
+            st.write("")
+            #andiamo a creare un pulsante per eliminare i file caricati, se presenti
+            if st.button(
+                current_lang["delete_uploaded"],
+                key="delete_uploaded_files"
+            ):
+                
+                #andiamo ad inizializzare una nuova session state impostando il valore di file_uploader_reset a 1 in
+                #caso non sia presente, altrimenti lo incrementiamo di 1 ogni volta che viene premuto il pulsante, 
+                #in modo tale da forzare il refresh del file_uploader e resettarlo del tutto
+                if 'file_uploader_reset' not in st.session_state:
+                    st.session_state['file_uploader_reset'] = 1
+                else:
+                    st.session_state['file_uploader_reset'] += 1
+                st.rerun()
+        #impostiamo una chiave dinamica da mettere poi nel file_uploader, che va a prendere il valore di file_uploader_reset
+        #se non è presente lo inizializziamo a 0, in modo tale da poterlo usare come chiave dinamica
+        file_uploader_key = f"file_uploader_{st.session_state.get('file_uploader_reset', 0)}"
         uploaded_files = st.file_uploader(
             label=current_lang["upload_label"], 
             type=["pdf", "jpg","png", "jpeg"],
-            key="file_uploader",
+            key=file_uploader_key,
             label_visibility="hidden",
             accept_multiple_files=True
             )
