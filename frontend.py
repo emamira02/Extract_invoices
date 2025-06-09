@@ -242,9 +242,9 @@ else:
 
             #andiamo ad aggiungere la categoria selezionata nel dialog, se presente nella sessione
             if key_prefix and f"categoria_{key_prefix.replace('file_', '')}" in st.session_state:
-                translated_json_data["Categoria"] = st.session_state[f"categoria_{key_prefix.replace('file_', '')}"]
+                translated_json_data[current_lang["category_json"]] = st.session_state[f"categoria_{key_prefix.replace('file_', '')}"]
             else:
-                translated_json_data["Categoria"] = "N/A"
+                translated_json_data[current_lang["category_json"]] = "N/A"
 
         #usando un try-except per gestire eventuali errori, andiamo a creare un file json usando la libreria json e buffer
         #che andremo a scrivere e scaricare, in caso di successo restituisce un messaggio di successo, altrimenti un errore
@@ -301,6 +301,7 @@ else:
                 current_lang["delete_uploaded"],
                 key="delete_uploaded_files"
             ):
+                st.session_state['uploaded_files_data'] = {}
                 
                 #andiamo ad inizializzare una nuova session state impostando il valore di file_uploader_reset a 1 in
                 #caso non sia presente, altrimenti lo incrementiamo di 1 ogni volta che viene premuto il pulsante, 
