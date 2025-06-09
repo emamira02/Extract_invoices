@@ -240,6 +240,12 @@ else:
             product_list_key = {"IT": "Lista Prodotti", "EN": "Product List", "ES": "Lista de Productos"}[st.session_state['language']]
             translated_json_data[product_list_key] = lista_prodotti
 
+            #andiamo ad aggiungere la categoria selezionata nel dialog, se presente nella sessione
+            if key_prefix and f"categoria_{key_prefix.replace('file_', '')}" in st.session_state:
+                translated_json_data["Categoria"] = st.session_state[f"categoria_{key_prefix.replace('file_', '')}"]
+            else:
+                translated_json_data["Categoria"] = "N/A"
+
         #usando un try-except per gestire eventuali errori, andiamo a creare un file json usando la libreria json e buffer
         #che andremo a scrivere e scaricare, in caso di successo restituisce un messaggio di successo, altrimenti un errore
         #relativo all'aggiornamento e download del file, restituisce i dati in italiano aggiornati 
@@ -335,61 +341,94 @@ else:
 
         col_home1, col_home2 = st.columns(2, gap="medium")
         if uploaded_files:
+            uploaded_file_paths = {}
+            categories_selected = True
             for uploaded_file in uploaded_files:
                 if uploaded_file.name in st.session_state['uploaded_files_data']:
                     st.info(current_lang["file_already_analyzed"].format(file_name=uploaded_file.name))
                     continue
 
                 temporary_file_path, file_content = handle_file_upload(uploaded_file)
-                st.success(f"{current_lang['success_upload'].format(file_name=uploaded_file.name)}")
-
                 if temporary_file_path:
+                    uploaded_file_paths[uploaded_file.name] = {
+                        "path": temporary_file_path,
+                        "content": file_content
+                    }
+                    st.success(f"{current_lang['success_upload'].format(file_name=uploaded_file.name)}")
+                else:
+                  categories_selected = False
+                  break
+            #modifichiamo la logica del codice per mostrare il pop up di ciascun file caricato
+            #non appena essi vengono caricati con successo
+            for uploaded_file in uploaded_files:
+              if f"categoria_{uploaded_file.name}" not in st.session_state:
+                @st.dialog(f"Select Category - {uploaded_file.name}")
+                def select_category_for_file():
+                    if f"categoria_{uploaded_file.name}" not in st.session_state:
+                        category = st.selectbox(
+                            current_lang["category_question"].format(file_name=uploaded_file.name),
+                            current_lang['category'],
+                            key=f"category_select_{uploaded_file.name}"
+                        )
+                        if st.button("Confirm", key=f"confirm_{uploaded_file.name}"):
+                            st.session_state[f"categoria_{uploaded_file.name}"] = category
+                            return True
+                    return False
+                select_category_for_file()
+                st.rerun()
+            
+    #poniamo una variabile booleana che va a controllare se tutte le categorie sono state selezionate,
+    #se tutte le categorie sono state selezionate allora andiamo ad analizzare i file caricati
+            cat_analyze = True
+            for uploaded_file in uploaded_files:
+              if f"categoria_{uploaded_file.name}" not in st.session_state:
+                cat_analyze = False
+                break
+            if cat_analyze:
+                for file_name, file_data in uploaded_file_paths.items():
                     with st.spinner(current_lang["analyzing_document"]):
                         try:
-                            with open(temporary_file_path, "rb") as f:
-                                file_content = f.read()
-                                
                                 #andiamo, con un try-except, ad aprire il file temporaneo in formato binario,
                                 #selezioniamo la prima pagina e generiamo un pixmap senza canale alpha
                                 #per evitare problemi di OCR, in caso di errore andiamo a restituire un errore
-                                try:
-                                    try_ocr(temporary_file_path)
-                                except Exception as ocr_e:
-                                    logging.warning(f"OCR processing failed: {ocr_e}")
-                                    st.session_state['ocr_pdf_bytes'] = None
+                            try:
+                                try_ocr(file_data["path"])
+                            except Exception as ocr_e:
+                                logging.warning(f"OCR processing failed: {ocr_e}")
+                                st.session_state['ocr_pdf_bytes'] = None
                 
-                                analyzed_data = analyze_invoice(file_content)
-                                analyzed_data["file_blob"] = file_content
-                                analyzed_data["temporary_file_path"] = temporary_file_path
+                            analyzed_data = analyze_invoice(file_data["content"])
+                            analyzed_data["file_blob"] = file_data["content"]
+                            analyzed_data["temporary_file_path"] = file_data["path"]
+                            analyzed_data[current_lang['category_json']] = st.session_state[f"categoria_{file_name}"]
                                 
                                 #andiamo a inserire i nostri data analizzati ed estratti nella nostra session
-                                st.session_state['uploaded_files_data'][uploaded_file.name] = analyzed_data
+                            st.session_state['uploaded_files_data'][file_name] = analyzed_data
                                 
                         #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
                         #andiamo a cancellare la più vecchia
-                                view_analysis = get_crono()
-                                if len(view_analysis) >= 10:
-                                    oldest_analysis = view_analysis[-1] 
-                                    oldest_id = oldest_analysis[0]
-                                    oldest_temp_file_path = os.path.join(temp_files_direct(), f"temp_{oldest_id}.pdf")
-                                    delete_temp_file(oldest_temp_file_path)
-                                    delete_oldest_analysis()
+                            view_analysis = get_crono()
+                            if len(view_analysis) >= 10:
+                                oldest_analysis = view_analysis[-1]
+                                oldest_id = oldest_analysis[0]
+                                oldest_temp_file_path = os.path.join(temp_files_direct(), f"temp_{oldest_id}.pdf")
+                                delete_temp_file(oldest_temp_file_path)
+                                delete_oldest_analysis()
 
                         # rimuoviamo temporaneamente il blob dai dati estratti ed usiamo add_analysis_history per salvare 
                         # sia i dati estratti che il file come blob, per poi ripristinare il blob
-                                file_blob = analyzed_data.pop("file_blob", None)
-                                add_analysis_history(uploaded_file.name, analyzed_data, file_blob)
-                                if file_blob:
-                                    analyzed_data["file_blob"] = file_blob
+                            file_blob = analyzed_data.pop("file_blob", None)
+                            add_analysis_history(file_name, analyzed_data, file_blob)
+                            if file_blob:
+                                analyzed_data["file_blob"] = file_blob
                                     
-                                st.success(f"{current_lang["analysis_success"]} {uploaded_file.name}")
-                                logging.info(f"Document analysis completed successfully for {uploaded_file.name}")
+                            st.success(f"{current_lang['analysis_success']} {file_name}")
+                            logging.info(f"Document analysis completed successfully for {file_name}")
                                 
                         except Exception as e:
                             logging.error(f"Error during document analysis: {e}")
                             st.error(current_lang["error_upload"].format(error=e))
                             st.session_state['extracted_data'] = None
-                            break
 
                 #per ogni file presente in sessione, usiamo un expander per la visualizzazione e
                 #se i dati estratti sono presenti usiamo la funzione per poter permettere la 
