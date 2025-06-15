@@ -3,7 +3,7 @@ import os
 import datetime
 import pandas as pd
 import logging
-from database import get_crono, get_data_analysis, clear_db_history
+from backend.database import *
 from frontend import translations, edit_data, delete_temp_file, show_navigation
 from streamlit_searchbox import st_searchbox
 
