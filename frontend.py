@@ -5,13 +5,14 @@ import pandas as pd
 import os
 import io
 from io import BytesIO
-from PIL import Image, ImageDraw
+from PIL import Image
 import streamlit.components.v1 as components
-from backend import analyze_invoice, download_button, create_annotated_image
-from database import create_database, add_analysis_history, get_crono, get_data_analysis, delete_oldest_analysis
-from lang import translations, set_language
-from tempfile_del import delete_temp_file
-from files_ocr import handle_file_upload, temp_files_direct
+from backend.analyze_func import *
+from backend.database import *
+from backend.download import download_button
+from backend.lang import translations, set_language
+from backend.tempfile_del import delete_temp_file
+from backend.files_ocr import *
 import pymupdf
 from dotenv import load_dotenv
 
@@ -42,13 +43,16 @@ with st.sidebar:
             ""
             st.title(":globe_with_meridians:**Dashboard**")
         with col2:
+            #andiamo a selezionare la lingua, in modo tale da poterla cambiare in base alla selezione dell'utente
+            if 'language' not in st.session_state:
+                st.session_state.language = 'IT'
+            
             lang = st.selectbox(
                 "A", 
                 ["IT", "EN", "ES"], 
                 label_visibility="hidden",
-                key="dashboard_lang_selector",
-                index=["IT", "EN", "ES"].index(st.session_state['language']),  
-                on_change=lambda: st.session_state.update(language=st.session_state.dashboard_lang_selector) 
+                index=["IT", "EN", "ES"].index(st.session_state['language']),
+                key="dashboard_lang_selector"
             )
             #andiamo a salvare la lingua selezionata nella sessione, in modo tale da non doverla cambiare ogni volta
             if lang != st.session_state['language']:
@@ -69,9 +73,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-
 def show_navigation(page_prefix=""):
-    """Display consistent navigation buttons in the sidebar."""
     if st.button(":house:**Homepage**", use_container_width=True, key=f"{page_prefix}_dashboard_btn"):
         st.session_state['current_page'] = 'dashboard'
         st.switch_page("frontend.py")
@@ -143,7 +145,6 @@ else:
                     #andiamo a verificare se il file blob, i poligoni, i dati ocr e l'immagine originale sono presenti,  
                     has_file_blob = "file_blob" in data and data["file_blob"]
                     has_polygons = "polygons" in data and data["polygons"]
-                    has_ocr_data = 'ocr_pdf_bytes' in st.session_state and st.session_state['ocr_pdf_bytes']
                     has_original_image = 'original_image' in st.session_state
                     
                     st.header(current_lang["extract_image"])
@@ -162,64 +163,7 @@ else:
                         except Exception as anno_e:
                             logging.warning(f"Failed to create annotated image: {anno_e}")
                             display_successful = False
-                            
-                                    #andiamo a aprire il file pdf, lo convertiamo in immagine, salviamo
-                                    #l'immagine in un buffer e la mostriamo, altrimenti mostriamo l'immagine originale
-                            if has_ocr_data:
-                                try:
-                                    
-                                    ocr_doc = pymupdf.open("pdf", st.session_state['ocr_pdf_bytes'])
-                                    page = ocr_doc[0]
-                                    pix = page.get_pixmap()
-                                    
-                                    img = Image.open(io.BytesIO(pix.tobytes("png")))
-                                    draw = ImageDraw.Draw(img)
-                                    
-                                    #prendiamo le dimensioni dell'immagine 
-                                    img_width, img_height = img.size
-                                    
-                                    #per ogni poligono presente andiamo a calcolare le coordinate e poi a disegnare il rettangolo
-                                    for polygon in data["polygons"]:
-                                        if "polygon" in polygon and len(polygon["polygon"]) >= 4:
-                                            points = polygon["polygon"]
-                                            x_coords = [p["x"] for p in points]
-                                            y_coords = [p["y"] for p in points]
-                                            
-                                            x0, y0 = min(x_coords), min(y_coords)
-                                            x1, y1 = max(x_coords), max(y_coords)
-                                            #andiamo a scalare le coordinate in base alla dimensione dell'immagine, normalizzando prima
-                                            #le coordinate in un range 0-1 e scalando in base alla dimensione dell'immagine
-                                            doc_width = st.session_state.get('doc_dimensions', {}).get('width', page.rect.width)
-                                            doc_height = st.session_state.get('doc_dimensions', {}).get('height', page.rect.height)
-                                            
-                                            x0_norm = x0 / doc_width
-                                            y0_norm = y0 / doc_height
-                                            x1_norm = x1 / doc_width
-                                            y1_norm = y1 / doc_height
-                                            
-                                            x0_px = x0_norm * img_width
-                                            y0_px = y0_norm * img_height
-                                            x1_px = x1_norm * img_width
-                                            y1_px = y1_norm * img_height
-                                            
-                                            #qui infine andiamo a disegnare il rettangolo usando le 
-                                            #coordinate calcolate prima dal poligono
-                                            draw.rectangle([(x0_px, y0_px), (x1_px, y1_px)], outline="red", width=3)
-                                            
-                                    #come detto prima, andiamo poi a convertire l'immagine in bytes e infine chiudiamo il file
-                                    img_bytes = io.BytesIO()
-                                    img.save(img_bytes, format='PNG')
-                                    img_bytes.seek(0)
-                                    
-                                    st.image(img_bytes)
-                                    logging.info("Successfully displayed OCR image with bounding boxes")
-                                    display_successful = True
-                                    
-                                    ocr_doc.close()
-                                    
-                                except Exception as ocr_display_e:
-                                    logging.warning(f"Failed to display OCR image with bounding boxes: {ocr_display_e}")
-                                    display_successful = False
+
                     else:
                         display_successful = False
                         
@@ -296,6 +240,12 @@ else:
             product_list_key = {"IT": "Lista Prodotti", "EN": "Product List", "ES": "Lista de Productos"}[st.session_state['language']]
             translated_json_data[product_list_key] = lista_prodotti
 
+            #andiamo ad aggiungere la categoria selezionata nel dialog, se presente nella sessione
+            if key_prefix and f"categoria_{key_prefix.replace('file_', '')}" in st.session_state:
+                translated_json_data[current_lang["category_json"]] = st.session_state[f"categoria_{key_prefix.replace('file_', '')}"]
+            else:
+                translated_json_data[current_lang["category_json"]] = "N/A"
+
         #usando un try-except per gestire eventuali errori, andiamo a creare un file json usando la libreria json e buffer
         #che andremo a scrivere e scaricare, in caso di successo restituisce un messaggio di successo, altrimenti un errore
         #relativo all'aggiornamento e download del file, restituisce i dati in italiano aggiornati 
@@ -305,22 +255,24 @@ else:
                 buff.write(json_string.encode('utf-8'))
                 buff.seek(0)
 
+                
                 if st.session_state.get("analysis_source") == "history":
-                    file_name = f"{st.session_state.get('selected_analysis_name')}.json"
-                else:
                     file_name = f"{st.session_state.get('uploaded_file_name')}.json"
+                else:
+                    base_filename = key_prefix.replace("file_", "") if key_prefix.startswith("file_") else st.session_state.get('uploaded_file_name', 'extracted_data')
+                    file_name = f"{base_filename}.json"
                 download_html = download_button(buff.getvalue(), file_name) 
                 components.html(
                     download_html,
                     height=0,
                 )
-                logging.info(f"JSON file {st.session_state['uploaded_file_name']}.json downloaded successfully.")
-                st.rerun()
+                logging.info(f"JSON file {file_name} downloaded successfully.")
 
             except Exception as e:
                 logging.error(f"Error during the data update and download: {e}")
                 st.error(current_lang["json_error"].format(error=e))
-            st.success(current_lang["json_success"])
+            
+            st.rerun()
         return data_it
 
     if st.session_state.get('current_page') != 'history':
@@ -330,12 +282,44 @@ else:
         st.markdown("---")
 
         #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
-        st.markdown(f"### :receipt: {current_lang['upload_label']}<div style='margin-bottom: -70px;'></div>", unsafe_allow_html=True)
-        uploaded_file = st.file_uploader(
+        if st.session_state['language'] == "IT":
+            col_fileupload, col_filedelete = st.columns([14, 1], gap="small")
+        elif st.session_state['language'] == "EN":
+            col_fileupload, col_filedelete = st.columns([13, 1], gap="small")
+        elif st.session_state['language'] == "ES":
+            col_fileupload, col_filedelete = st.columns([13, 1], gap="small")
+
+        with col_fileupload:
+            st.markdown(
+            f"### :receipt: {current_lang['upload_label']}",
+            unsafe_allow_html=True
+            )
+        with col_filedelete:
+            st.write("")
+            #andiamo a creare un pulsante per eliminare i file caricati, se presenti
+            if st.button(
+                current_lang["delete_uploaded"],
+                key="delete_uploaded_files"
+            ):
+                st.session_state['uploaded_files_data'] = {}
+                
+                #andiamo ad inizializzare una nuova session state impostando il valore di file_uploader_reset a 1 in
+                #caso non sia presente, altrimenti lo incrementiamo di 1 ogni volta che viene premuto il pulsante, 
+                #in modo tale da forzare il refresh del file_uploader e resettarlo del tutto
+                if 'file_uploader_reset' not in st.session_state:
+                    st.session_state['file_uploader_reset'] = 1
+                else:
+                    st.session_state['file_uploader_reset'] += 1
+                st.rerun()
+        #impostiamo una chiave dinamica da mettere poi nel file_uploader, che va a prendere il valore di file_uploader_reset
+        #se non è presente lo inizializziamo a 0, in modo tale da poterlo usare come chiave dinamica
+        file_uploader_key = f"file_uploader_{st.session_state.get('file_uploader_reset', 0)}"
+        uploaded_files = st.file_uploader(
             label=current_lang["upload_label"], 
             type=["pdf", "jpg","png", "jpeg"],
-            key="file_uploader",
+            key=file_uploader_key,
             label_visibility="hidden",
+            accept_multiple_files=True
             )
         logging.info("Waiting for the file upload")
 
@@ -348,143 +332,139 @@ else:
             st.session_state['temporary_file_path'] = None
         if 'analysis_source' not in st.session_state:
             st.session_state['analysis_source'] = None
+        if 'uploaded_files_data' not in st.session_state:
+            st.session_state['uploaded_files_data'] = {}
 
-    #se il file è stato caricato con successo , gestiamo l'upload con la nostra funzione
-    #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto restituendo
-    #estracted_data come variabile, in caso contrario restituisce un errore durante l'aalisi del documento
-        if uploaded_file is not None:
-            #inseriamo la variabile di sessione per l'uploaded_file in modo tale da
-            #riavviare l'analisi in caso di cambio file caricato, resettando i dati estratti
-            if uploaded_file.name != st.session_state.get('uploaded_file_name'):
+    #se uploaded_files è presente allora per ciascun file in esso se il nome è già presente nella session
+    #allora non analizza e passa alla prossima, gestiamo l'upload con la nostra funzione
+    #e creiamo un file temporaneo, che verrà aperto in formato binario e verrà letto, in caso non sia stato
+    #possibile analizzare il file, restituisce un errore
+
+        col_home1, col_home2 = st.columns(2, gap="medium")
+        if uploaded_files:
+            uploaded_file_paths = {}
+            categories_selected = True
+            for uploaded_file in uploaded_files:
+                if uploaded_file.name in st.session_state['uploaded_files_data']:
+                    st.info(current_lang["file_already_analyzed"].format(file_name=uploaded_file.name))
+                    continue
+
+                temporary_file_path, file_content = handle_file_upload(uploaded_file)
+                if temporary_file_path:
+                    uploaded_file_paths[uploaded_file.name] = {
+                        "path": temporary_file_path,
+                        "content": file_content
+                    }
+                    st.success(f"{current_lang['success_upload'].format(file_name=uploaded_file.name)}")
+                else:
+                  categories_selected = False
+                  break
+            #modifichiamo la logica del codice per mostrare il pop up di ciascun file caricato
+            #non appena essi vengono caricati con successo
+            for uploaded_file in uploaded_files:
+              if f"categoria_{uploaded_file.name}" not in st.session_state:
+                @st.dialog(f"Select Category - {uploaded_file.name}")
+                def select_category_for_file():
+                    if f"categoria_{uploaded_file.name}" not in st.session_state:
+                        category = st.selectbox(
+                            current_lang["category_question"].format(file_name=uploaded_file.name),
+                            current_lang['category'],
+                            key=f"category_select_{uploaded_file.name}"
+                        )
+                        if st.button("Confirm", key=f"confirm_{uploaded_file.name}"):
+                            st.session_state[f"categoria_{uploaded_file.name}"] = category
+                            return True
+                    return False
+                select_category_for_file()
+                st.rerun()
             
-                st.session_state['extracted_data'] = None  
-                st.session_state['uploaded_file_name'] = uploaded_file.name
-                if st.session_state['temporary_file_path']:
-                    delete_temp_file(st.session_state['temporary_file_path'])
-                    st.session_state['temporary_file_path'] = None
-
-            st.success(current_lang["success_upload"].format(file_name=uploaded_file.name))
-            logging.info(f"File {uploaded_file.name} uploaded successfully.")
-
-            temporary_file_path, file_content = handle_file_upload(uploaded_file)
-
-            if temporary_file_path:
-                if st.session_state['extracted_data'] is None or st.session_state['temporary_file_path'] != temporary_file_path:
-                    st.session_state['temporary_file_path'] = temporary_file_path
-
-                if st.session_state['extracted_data'] is None:
+    #poniamo una variabile booleana che va a controllare se tutte le categorie sono state selezionate,
+    #se tutte le categorie sono state selezionate allora andiamo ad analizzare i file caricati
+            cat_analyze = True
+            for uploaded_file in uploaded_files:
+              if f"categoria_{uploaded_file.name}" not in st.session_state:
+                cat_analyze = False
+                break
+            if cat_analyze:
+                for file_name, file_data in uploaded_file_paths.items():
                     with st.spinner(current_lang["analyzing_document"]):
-                        logging.info("Analyzing the document...")
                         try:
-                            with open(temporary_file_path, "rb") as f: 
-                                file_content = f.read()
-                                
                                 #andiamo, con un try-except, ad aprire il file temporaneo in formato binario,
                                 #selezioniamo la prima pagina e generiamo un pixmap senza canale alpha
                                 #per evitare problemi di OCR, in caso di errore andiamo a restituire un errore
-                                try:
-                                    doc = pymupdf.open(temporary_file_path)
-                                    page = doc[0]
-                                    pix = page.get_pixmap(alpha=False)
-                                    
-                                    #andiamo a creare un’immagine a partire dai dati del pixmap, salvata in un buffer 
-                                    # di memoria e poi la memorizziamo nella session state
-                                    img_bytes_original = io.BytesIO()
-                                    img_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                                    img_original.save(img_bytes_original, format='PNG')
-                                    img_bytes_original.seek(0)
-                                    st.session_state['original_image'] = img_bytes_original.getvalue()
-                                    
-                                    #andiamo a memorizzare le dimensioni del documento nella session state
-                                    #per poterle usare in seguito per il disegno dei bounding box
-                                    st.session_state['doc_dimensions'] = {
-                                        'width': page.rect.width,
-                                        'height': page.rect.height
-                                    }
-                                    
-                                    #andiamo a richiamare il metodo pdfocr_tobytes per generare un PDF che incorpora i risultati OCR,
-                                    #settando i vari parametri come compressione, lingua e percorso tessdata
-                                    ocr_pdf_bytes = pix.pdfocr_tobytes(
-                                        compress=True,
-                                        language='eng+ita',
-                                        tessdata= os.getenv("TESSDATA_PREFIX"),
-                                    )
-                                    
-                                    #andiamo a memorizzare il PDF OCR nella session state
-                                    #in modo tale da poterlo usare in seguito per il disegno dei bounding box ed infine chiudiamo il file
-                                    st.session_state['ocr_pdf_bytes'] = ocr_pdf_bytes
-                                    logging.info("OCR processing completed successfully")
-                                    
-                                    doc.close()
-                                    
-                                except Exception as ocr_e:
-                                    logging.warning(f"OCR processing failed: {ocr_e}")
-                                    st.session_state['ocr_pdf_bytes'] = None
+                            try:
+                                try_ocr(file_data["path"])
+                            except Exception as ocr_e:
+                                logging.warning(f"OCR processing failed: {ocr_e}")
+                                st.session_state['ocr_pdf_bytes'] = None
                 
-                                st.session_state['extracted_data'] = analyze_invoice(file_content)
-                                st.session_state['extracted_data']["file_blob"] = file_content
-                            
+                            analyzed_data = analyze_invoice(file_data["content"])
+                            analyzed_data["file_blob"] = file_data["content"]
+                            analyzed_data["temporary_file_path"] = file_data["path"]
+                            analyzed_data[current_lang['category_json']] = st.session_state[f"categoria_{file_name}"]
+                                
+                                #andiamo a inserire i nostri data analizzati ed estratti nella nostra session
+                            st.session_state['uploaded_files_data'][file_name] = analyzed_data
+                                
                         #andiamo a controllare se la cronologia è piena, se vi sono più di 10 analisi allora
                         #andiamo a cancellare la più vecchia
                             view_analysis = get_crono()
                             if len(view_analysis) >= 10:
-                                oldest_analysis = view_analysis[-1] 
+                                oldest_analysis = view_analysis[-1]
                                 oldest_id = oldest_analysis[0]
                                 oldest_temp_file_path = os.path.join(temp_files_direct(), f"temp_{oldest_id}.pdf")
                                 delete_temp_file(oldest_temp_file_path)
                                 delete_oldest_analysis()
-                                logging.info("Oldest analysis deleted to maintain history size limit.")
 
                         # rimuoviamo temporaneamente il blob dai dati estratti ed usiamo add_analysis_history per salvare 
                         # sia i dati estratti che il file come blob, per poi ripristinare il blob
-                            file_blob = st.session_state['extracted_data'].pop("file_blob", None)
-                            add_analysis_history(st.session_state['uploaded_file_name'], st.session_state['extracted_data'], file_blob)
-                            if file_blob: 
-                                st.session_state['extracted_data']["file_blob"] = file_blob
+                            file_blob = analyzed_data.pop("file_blob", None)
+                            add_analysis_history(file_name, analyzed_data, file_blob)
+                            if file_blob:
+                                analyzed_data["file_blob"] = file_blob
+                                    
+                            st.success(f"{current_lang['analysis_success']} {file_name}")
+                            logging.info(f"Document analysis completed successfully for {file_name}")
                                 
-                            logging.info("Document analysis completed successfully.")
-                            st.session_state['analysis_source'] = 'new'
-                            st.rerun()
                         except Exception as e:
                             logging.error(f"Error during document analysis: {e}")
                             st.error(current_lang["error_upload"].format(error=e))
                             st.session_state['extracted_data'] = None
-                            logging.error("Document analysis failed.")
 
+                #per ogni file presente in sessione, usiamo un expander per la visualizzazione e
                 #se i dati estratti sono presenti usiamo la funzione per poter permettere la 
                 #modifica di essi, in caso contrario restituisce un errore di estrazione dati
                 #inoltre andiamo a salvare i dati estratti nel database, in modo tale da poterli
                 #recuperare in un secondo momento, e mostrare la cronologia delle analisi
-                if st.session_state['extracted_data']:
-                    if st.session_state['analysis_source'] == 'new':
-                        st.header(current_lang["analysis_info"])
-                        edit_data(st.session_state['extracted_data'], current_lang=current_lang, key_prefix="new_upload")
-
-                    else:
-                        logging.info("Skipping duplicate display for new analysis.")
-                else:
-                    st.error(current_lang["data_extraction_error"])
-                    logging.error("Failed to extract data from the document.")
+            uploaded_files_list = list(st.session_state['uploaded_files_data'].items())
+            if uploaded_files_list:
+                col_left, col_right = st.columns(2, gap="medium")
+                #mettiamo il primo file nella colonna di sinistra, expander aperto, tutti gli altri files
+                #nella colonna di destra, expander chiuso
+                filename_first, file_data_first = uploaded_files_list[0]
+                with col_left:
+                    with st.expander(f"**{current_lang["analysis_details"]}** -- {filename_first}", expanded=True):
+                        st.header(f"**{current_lang["analysis_info"]}**")
+                        edit_data(
+                            file_data_first,
+                            current_lang=current_lang,
+                            key_prefix=f"file_{filename_first}",
+                            show_image_with_bbox=True
+                        )
+                with col_right:
+                    for filename, file_data in uploaded_files_list[1:]:
+                        with st.expander(f"**{current_lang["analysis_details"]}** -- {filename}", expanded=False):
+                            st.header(f"**{current_lang["analysis_info"]}**")
+                            ""
+                            edit_data(
+                                file_data,
+                                current_lang=current_lang,
+                                key_prefix=f"file_{filename}",
+                                show_image_with_bbox=True
+                            )
             else:
-                logging.warning("File upload failed.")
-                st.warning(current_lang["no_file_warning"])
-
-    #se la sessione è già stata avviata e i dati estratti sono presenti,
-    #andiamo a mostrare la cronologia delle analisi effettuate, in modo tale da poterle visualizzare
-    #ed usando la query_params per mostrare i dati estratti in base all'get_analysis selezionata
-        if "all_history" in st.session_state and st.session_state['extracted_data']:
-            if st.session_state['analysis_source'] != 'new':
-                st.header(current_lang["analysis_info"].format(st.session_state['uploaded_file_name']))
-                edit_data(st.session_state['extracted_data'], key_prefix="history_view", show_image_with_bbox=True)
-
-        query_params = st.query_params
-
-        
-        if "get_analysis" in query_params:
-            id_get_analysis = int(query_params["get_analysis"][0])
-            dati_get_analysis = get_data_analysis(id_get_analysis)
-            if dati_get_analysis:
-                st.session_state['extracted_data'] = dati_get_analysis
-                st.session_state['uploaded_file_name'] = next(
-                    (op[1] for op in view_analysis if op[0] == id_get_analysis), None
-                )
+                st.error(current_lang["data_extraction_error"])
+                logging.error("Failed to extract data from the document.")
+        else:
+            logging.info("No files uploaded.")
+            st.info(current_lang["no_file_warning"])
