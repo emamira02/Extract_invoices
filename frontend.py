@@ -343,12 +343,10 @@ else:
         col_home1, col_home2 = st.columns(2, gap="medium")
         if uploaded_files:
             uploaded_file_paths = {}
-            categories_selected = True
             for uploaded_file in uploaded_files:
                 if uploaded_file.name in st.session_state['uploaded_files_data']:
                     st.info(current_lang["file_already_analyzed"].format(file_name=uploaded_file.name))
                     continue
-
                 temporary_file_path, file_content = handle_file_upload(uploaded_file)
                 if temporary_file_path:
                     uploaded_file_paths[uploaded_file.name] = {
@@ -357,34 +355,36 @@ else:
                     }
                     st.success(f"{current_lang['success_upload'].format(file_name=uploaded_file.name)}")
                 else:
-                  categories_selected = False
-                  break
+                    None
+                
             #modifichiamo la logica del codice per mostrare il pop up di ciascun file caricato
             #non appena essi vengono caricati con successo
+            file_to_categorize = None
             for uploaded_file in uploaded_files:
-              if f"categoria_{uploaded_file.name}" not in st.session_state:
-                @st.dialog(f"Select Category - {uploaded_file.name}")
+                if f"categoria_{uploaded_file.name}" not in st.session_state:
+                    file_to_categorize = uploaded_file
+                    break
+
+            if file_to_categorize is not None:
+                @st.dialog(f"Select Category - {file_to_categorize.name}")
                 def select_category_for_file():
-                    if f"categoria_{uploaded_file.name}" not in st.session_state:
-                        category = st.selectbox(
-                            current_lang["category_question"].format(file_name=uploaded_file.name),
-                            current_lang['category'],
-                            key=f"category_select_{uploaded_file.name}"
-                        )
-                        if st.button("Confirm", key=f"confirm_{uploaded_file.name}"):
-                            st.session_state[f"categoria_{uploaded_file.name}"] = category
-                            return True
-                    return False
+                    category = st.selectbox(
+                        current_lang["category_question"].format(file_name=file_to_categorize.name),
+                        current_lang['category'],
+                        key=f"category_select_{file_to_categorize.name}"
+                    )
+                    if st.button("Confirm", key=f"confirm_{file_to_categorize.name}"):
+                        st.session_state[f"categoria_{file_to_categorize.name}"] = category
+                        st.rerun()
                 select_category_for_file()
-                st.rerun()
-            
+                st.stop()
     #poniamo una variabile booleana che va a controllare se tutte le categorie sono state selezionate,
     #se tutte le categorie sono state selezionate allora andiamo ad analizzare i file caricati
             cat_analyze = True
             for uploaded_file in uploaded_files:
-              if f"categoria_{uploaded_file.name}" not in st.session_state:
-                cat_analyze = False
-                break
+                if f"categoria_{uploaded_file.name}" not in st.session_state:
+                    cat_analyze = False
+                    break
             if cat_analyze:
                 for file_name, file_data in uploaded_file_paths.items():
                     with st.spinner(current_lang["analyzing_document"]):
