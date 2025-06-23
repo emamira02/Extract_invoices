@@ -223,7 +223,9 @@ else:
             }
             st.success(current_lang["data_success"])
 
-        # Mostra il pulsante di download solo se i dati sono stati aggiornati
+        #andiamo a verificare se i dati aggiornati sono presenti nella sessione
+        #e li prepariamo per il download in formato json
+        #se il key_prefix è presente, lo usiamo per identificare i dati aggiornati
         updated_data = st.session_state.get(f"updated_data_{key_prefix}")
         if updated_data:
             # Prepara i dati tradotti come prima
@@ -247,10 +249,17 @@ else:
             translated_json_data[current_lang["text_input"][6]] = json_data_italiano["Totale"]
             product_list_key = {"IT": "Lista Prodotti", "EN": "Product List", "ES": "Lista de Productos"}[st.session_state['language']]
             translated_json_data[product_list_key] = updated_data["lista_prodotti"]
+
+            #andiamo ad aggiungere la categoria selezionata nel dialog, se presente nella sessione
             if key_prefix and f"categoria_{key_prefix.replace('file_', '')}" in st.session_state:
                 translated_json_data[current_lang["category_json"]] = st.session_state[f"categoria_{key_prefix.replace('file_', '')}"]
             else:
                 translated_json_data[current_lang["category_json"]] = "N/A"
+
+            #usando un try-except per gestire eventuali errori, andiamo a creare un file json usando la libreria json
+            #e lo scriviamo in un buffer, poi lo convertiamo in bytes e lo rendiamo scaricabile e, se la sessione è in cronologia,
+            #andiamo a prendere il nome del file altrimenti prendiamo il nome del file caricato dall'utente, se non è presente
+            #prendiamo il nome del file estratto e lo rendiamo scaricabile, 
             try:
                 json_string = json.dumps(translated_json_data, indent=4, ensure_ascii=False)
                 buff = BytesIO()
@@ -261,14 +270,14 @@ else:
                 else:
                     base_filename = key_prefix.replace("file_", "") if key_prefix.startswith("file_") else st.session_state.get('uploaded_file_name', 'extracted_data')
                     file_name = f"{base_filename}.json"
-                st.download_button(
+                download_clicked = st.download_button(
                     label=current_lang["json_download"],
                     data=buff.getvalue(),
                     file_name=file_name,
                     mime="application/json",
                     key=f"download_btn_{key_prefix}"
                 )
-                if st.download_button:
+                if download_clicked:
                     st.success(current_lang["json_download_success"])
             except Exception as e:
                 logging.error(f"Error during the data update and download: {e}")
@@ -343,17 +352,21 @@ else:
         col_home1, col_home2 = st.columns(2, gap="medium")
         if uploaded_files:
             uploaded_file_paths = {}
+            if 'toast_shown_files' not in st.session_state:
+                st.session_state['toast_shown_files'] = set()
             for uploaded_file in uploaded_files:
-                if uploaded_file.name in st.session_state['uploaded_files_data']:
-                    st.info(current_lang["file_already_analyzed"].format(file_name=uploaded_file.name))
-                    continue
                 temporary_file_path, file_content = handle_file_upload(uploaded_file)
                 if temporary_file_path:
                     uploaded_file_paths[uploaded_file.name] = {
                         "path": temporary_file_path,
                         "content": file_content
                     }
-                    st.success(f"{current_lang['success_upload'].format(file_name=uploaded_file.name)}")
+                    if uploaded_file.name not in st.session_state['toast_shown_files']:
+                        st.toast(
+                            f"{current_lang['success_upload'].format(file_name=uploaded_file.name)}",
+                            icon="✅"
+                        )
+                        st.session_state['toast_shown_files'].add(uploaded_file.name)
                 else:
                     None
                 
@@ -423,7 +436,7 @@ else:
                             if file_blob:
                                 analyzed_data["file_blob"] = file_blob
                                     
-                            st.success(f"{current_lang['analysis_success']} {file_name}")
+                            st.success(f"{current_lang['analysis_success']} **{file_name}**")
                             logging.info(f"Document analysis completed successfully for {file_name}")
                                 
                         except Exception as e:
