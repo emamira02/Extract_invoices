@@ -36,7 +36,7 @@ translations = {
         "logout_button": "Log out",
         "greeting": "Ciao, **{name}**, {email}",
         "upload_label": "Carica una Fattura o una Ricevuta",
-        "success_upload": "File {file_name} caricato con successo",
+        "success_upload": "File **{file_name}** caricato con successo",
         "analysis_success": "Analisi completata con successo per il file: ",
         "extract_image": "Immagine con bounding box",
         "error_upload": "Errore durante l'analisi del documento: {error}",
