@@ -115,7 +115,8 @@ else:
         #andiamo a creare una barra di ricerca per filtrare le analisi in base alla query di ricerca
         search_query = st_searchbox(
             search_function=search_analysis,
-            key="history_search"
+            key="history_search",
+            clear_on_submit=False
         )
     
     with clear_button_col:
