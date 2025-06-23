@@ -9,7 +9,6 @@ from PIL import Image
 import streamlit.components.v1 as components
 from backend.analyze_func import *
 from backend.database import *
-from backend.download import download_button
 from backend.lang import translations, set_language
 from backend.tempfile_del import delete_temp_file
 from backend.files_ocr import *
@@ -214,21 +213,30 @@ else:
                     logging.error(f"Error displaying image with bounding boxes: {e}")
                     st.error(current_lang["rectangle_error"].format(error=e))
 
-            submit_button = st.form_submit_button(label=current_lang["update_download_button"])
+            submit_button = st.form_submit_button(label=current_lang["update_data_button"])
 
         if submit_button:
-            json_data_italiano = {
-                "Nome Venditore": data_it["Nome Venditore"],
-                "Indirizzo Venditore": data_it["Indirizzo Venditore"],
-                "Numero di telefono Venditore": data_it["Numero di telefono Venditore"],
-                "Data": data_it["Data"],
-                "Orario": data_it["Orario"],
-                "PIVA": data_it["PIVA"],
-                "Totale": data_it["Totale"],
-                "Lista Prodotti": lista_prodotti
+            st.session_state[f"updated_data_{key_prefix}"] = {
+                "data_it": data_it,
+                "lista_prodotti": lista_prodotti,
+                "key_prefix": key_prefix
             }
+            st.success(current_lang["data_success"])
 
-            #andiamo a tradurre le chiavi prese nella lingua selezionata, affinchè il file json sia nella lingua corretta
+        # Mostra il pulsante di download solo se i dati sono stati aggiornati
+        updated_data = st.session_state.get(f"updated_data_{key_prefix}")
+        if updated_data:
+            # Prepara i dati tradotti come prima
+            json_data_italiano = {
+                "Nome Venditore": updated_data["data_it"]["Nome Venditore"],
+                "Indirizzo Venditore": updated_data["data_it"]["Indirizzo Venditore"],
+                "Numero di telefono Venditore": updated_data["data_it"]["Numero di telefono Venditore"],
+                "Data": updated_data["data_it"]["Data"],
+                "Orario": updated_data["data_it"]["Orario"],
+                "PIVA": updated_data["data_it"]["PIVA"],
+                "Totale": updated_data["data_it"]["Totale"],
+                "Lista Prodotti": updated_data["lista_prodotti"]
+            }
             translated_json_data = {}
             translated_json_data[current_lang["text_input"][0]] = json_data_italiano["Nome Venditore"]
             translated_json_data[current_lang["text_input"][1]] = json_data_italiano["Indirizzo Venditore"]
@@ -238,41 +246,33 @@ else:
             translated_json_data[current_lang["text_input"][5]] = json_data_italiano["PIVA"]
             translated_json_data[current_lang["text_input"][6]] = json_data_italiano["Totale"]
             product_list_key = {"IT": "Lista Prodotti", "EN": "Product List", "ES": "Lista de Productos"}[st.session_state['language']]
-            translated_json_data[product_list_key] = lista_prodotti
-
-            #andiamo ad aggiungere la categoria selezionata nel dialog, se presente nella sessione
+            translated_json_data[product_list_key] = updated_data["lista_prodotti"]
             if key_prefix and f"categoria_{key_prefix.replace('file_', '')}" in st.session_state:
                 translated_json_data[current_lang["category_json"]] = st.session_state[f"categoria_{key_prefix.replace('file_', '')}"]
             else:
                 translated_json_data[current_lang["category_json"]] = "N/A"
-
-        #usando un try-except per gestire eventuali errori, andiamo a creare un file json usando la libreria json e buffer
-        #che andremo a scrivere e scaricare, in caso di successo restituisce un messaggio di successo, altrimenti un errore
-        #relativo all'aggiornamento e download del file, restituisce i dati in italiano aggiornati 
             try:
                 json_string = json.dumps(translated_json_data, indent=4, ensure_ascii=False)
                 buff = BytesIO()
                 buff.write(json_string.encode('utf-8'))
                 buff.seek(0)
-
-                
                 if st.session_state.get("analysis_source") == "history":
                     file_name = f"{st.session_state.get('uploaded_file_name')}.json"
                 else:
                     base_filename = key_prefix.replace("file_", "") if key_prefix.startswith("file_") else st.session_state.get('uploaded_file_name', 'extracted_data')
                     file_name = f"{base_filename}.json"
-                download_html = download_button(buff.getvalue(), file_name) 
-                components.html(
-                    download_html,
-                    height=0,
+                st.download_button(
+                    label=current_lang["json_download"],
+                    data=buff.getvalue(),
+                    file_name=file_name,
+                    mime="application/json",
+                    key=f"download_btn_{key_prefix}"
                 )
-                logging.info(f"JSON file {file_name} downloaded successfully.")
-
+                if st.download_button:
+                    st.success(current_lang["json_download_success"])
             except Exception as e:
                 logging.error(f"Error during the data update and download: {e}")
                 st.error(current_lang["json_error"].format(error=e))
-            
-            st.rerun()
         return data_it
 
     if st.session_state.get('current_page') != 'history':
