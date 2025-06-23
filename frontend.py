@@ -276,18 +276,18 @@ else:
         return data_it
 
     if st.session_state.get('current_page') != 'history':
-        st.markdown(f"<h1 style='text-align: center;'>{current_lang['first_title'].replace(':blue[Azure AI]', '<span style=\"color:blue;\">Azure AI</span>').replace(':blue-background[', '<span style=\"background-color:#b3d7fe;\">').replace(']', '</span>')}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<h1 style='text-align: center;'>{current_lang['first_title']}</h1>", unsafe_allow_html=True)
         st.markdown(f"<h3 style='text-align: center; font-weight: bold;'>{current_lang['second_title']}</h3>", unsafe_allow_html=True)
         st.markdown(f"<h5 style='text-align: center;'>{current_lang['third_title']}</h3>", unsafe_allow_html=True)
         st.markdown("---")
 
         #usiamo la funzione di streamlit per caricare un file pdf e consentire solo quel formato
         if st.session_state['language'] == "IT":
-            col_fileupload, col_filedelete = st.columns([14, 1], gap="small")
+            col_fileupload, col_filedelete = st.columns([2, 0.1], gap="small")
         elif st.session_state['language'] == "EN":
-            col_fileupload, col_filedelete = st.columns([13, 1], gap="small")
+            col_fileupload, col_filedelete = st.columns([2, 0.1], gap="small")
         elif st.session_state['language'] == "ES":
-            col_fileupload, col_filedelete = st.columns([13, 1], gap="small")
+            col_fileupload, col_filedelete = st.columns([1.9, 0.1], gap="small")
 
         with col_fileupload:
             st.markdown(
