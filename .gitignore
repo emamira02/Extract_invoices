@@ -1,9 +1,22 @@
-venv/
-__pycache__/
-.vscode
-.streamlit/secrets.toml
-app.log
-client.ini
+# Secrets
 .env
-temp_files/
+.streamlit/secrets.toml
+client.ini
+
+# Runtime data
+history.db
 cronologia.db
+*.log
+temp_files/
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Editors
+.vscode/
+.idea/
+.DS_Store

@@ -3,7 +3,13 @@ services:
     build: .
     ports:
       - "8501:8501"
+    env_file:
+      - path: .env
+        required: false
     volumes:
-      - ./client.ini:/app/client.ini 
-      - ./.streamlit/secrets.toml:/app/.streamlit/secrets.toml
-      - ./.streamlit/config.toml:/app/.streamlit/config.toml
+      - history:/app/data
+      # Uncomment to enable Microsoft login:
+      # - ./.streamlit/secrets.toml:/app/.streamlit/secrets.toml:ro
+
+volumes:
+  history:

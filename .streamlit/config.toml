@@ -1,2 +1,5 @@
-[client]
-showSidebarNavigation = false
+[theme]
+primaryColor = "#1f5eff"
+
+[server]
+maxUploadSize = 10

@@ -1,140 +1,155 @@
-# Estrattore di Dati con Azure AI
+# Invoice & Receipt Data Extractor
 
-Questo progetto fornisce un'applicazione Streamlit che estrae dati da fatture e ricevute utilizzando Azure AI Document Intelligence. Consente agli utenti di caricare documenti, analizzarli, modificare i dati estratti, visualizzare le aree evidenziate sull'immagine e scaricare i risultati in formato JSON. L'applicazione gestisce anche il login utente tramite Microsoft Azure Entra ID e memorizza la cronologia delle analisi.
+[![tests](https://github.com/emamira02/Extract_invoices/actions/workflows/tests.yml/badge.svg)](https://github.com/emamira02/Extract_invoices/actions/workflows/tests.yml)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Streamlit](https://img.shields.io/badge/UI-Streamlit-ff4b4b)
+![Azure AI](https://img.shields.io/badge/Azure-Document%20Intelligence-0078d4)
 
-## Funzionalità
+A Streamlit web app that reads invoices and receipts with **Azure AI Document Intelligence**.
+You upload a PDF or a photo, the app extracts vendor, date, VAT number, total and line items,
+highlights where each value was found on the document, and lets you correct the data and export it as JSON.
 
-*   **Caricamento Documenti:** Supporta i formati di file PDF, JPG, JPEG e PNG.
-*   **Estrazione con Azure AI:** Utilizza Azure AI Document Intelligence per estrarre informazioni rilevanti da fatture e ricevute.
-*   **Modifica Dati:** Consente agli utenti di modificare i dati estratti tramite un'interfaccia interattiva.
-*   **Visualizzazione Dati:** Evidenzia i dati estratti sull'immagine del documento.
-*   **Download JSON:** Fornisce un pulsante di download per i dati estratti e modificati in formato JSON.
-*   **Autenticazione Utente:** Protegge l'accesso con il login di Microsoft Azure Entra ID tramite Streamlit's `st.experimental_user`.
-*   **Gestione della Cronologia:** Memorizza fino a 10 analisi nel database SQLite integrato, permettendo agli utenti di rivedere e scaricare analisi precedenti. Le analisi più vecchie vengono automaticamente eliminate per mantenere il limite.
-*   **Supporto Multilingue:** Interfaccia utente tradotta in Italiano, Inglese e Spagnolo, selezionabile tramite un menu a tendina nel sidebar.
-*   **Ricerca Analisi:** Possibilità di filtrare la cronologia delle analisi tramite una barra di ricerca.
-*   **Pulizia Cronologia:** Pulsante per cancellare l'intera cronologia delle analisi, con richiesta di conferma.
-*   **Gestione File Temporanei:** I file caricati vengono salvati in una cartella temporanea (`temp_files`) e gestiti per ridurre l'uso di memoria.
-*   **Dockerizzato:** Facilmente implementabile con Docker.
+**Live demo:** _add your Streamlit Community Cloud link here_ (runs in demo mode, see below)
 
-## Prerequisiti
+![Demo](docs/demo.gif)
 
-*   **Azure Subscription:** Una sottoscrizione Azure attiva con accesso ad Azure AI Document Intelligence.
-*   **Azure AI Document Intelligence Resource:** Una risorsa Document Intelligence creata nella tua sottoscrizione Azure. Avrai bisogno della chiave API e dell'endpoint per questa risorsa.
-*   **Microsoft Azure Entra ID:** Un Microsoft Azure Entra ID per l'autenticazione utente. Devi registrare un'applicazione in Azure AD e ottenere il Client ID e il Client Secret. Imposta l'URL di reindirizzamento (Redirect URI) dell'applicazione.
-*   **Python 3.12:** Python 3.12 o superiore installato.
-*   **Docker:** Docker installato per la containerizzazione(opzionale).
+## Features
 
-## Configurazione
+- **Upload** PDF, JPG or PNG files (several at once). Images are converted to PDF before analysis.
+- **Extraction** with two prebuilt Azure models: `prebuilt-invoice` for the invoice fields and line items,
+  and `prebuilt-receipt` for the phone number and transaction time, which the invoice model does not return.
+- **Visual check:** the fields are drawn as colored boxes on the first page of the document.
+- **Editing:** every field and line item can be corrected before export, plus an optional expense category.
+- **JSON export** with keys in the selected language.
+- **History:** the last 10 analyses per user are saved in SQLite and can be searched, reopened and cleared.
+- **Microsoft Entra ID login** (optional) through Streamlit's built-in `st.login()`, with an optional email allow-list.
+- **UI in English, Italian and Spanish.**
+- **Demo mode:** without Azure credentials the app still runs and shows a bundled sample, so anyone can try it for free.
 
-1.  **Clona il repository:**
+![Screenshot](docs/screenshot.png)
 
-    ```bash
-    git clone <URL_del_repository>
-    cd <directory_del_repository>
-    ```
+## Architecture
 
-2.  **Configura le Credenziali Azure AI:**
+```mermaid
+flowchart LR
+    U([User]) -->|upload PDF / JPG / PNG| UI
 
-    *   Crea un file chiamato `client.ini` nella directory principale del progetto.
-    *   Aggiungi il seguente contenuto a `client.ini`, sostituendo i segnaposto con la tua chiave API e URL endpoint effettivi:
+    subgraph App["Streamlit app"]
+        UI["ui/<br/>pages, editor, login"]
+        F["files.py<br/>validate + image to PDF"]
+        AZ["azure_client.py<br/>API calls + error mapping"]
+        P["parsing.py<br/>fields, items, boxes"]
+        A["annotate.py<br/>draw boxes on page 1"]
+        E["export.py<br/>JSON download"]
+        S[("storage.py<br/>SQLite history")]
+    end
 
-        ```ini
-        [DocumentAI]
-        api_key = TUA_CHIAVE_API
-        endpoint = TUO_URL_ENDPOINT
-        ```
+    UI --> F --> AZ
+    AZ -->|prebuilt-invoice<br/>prebuilt-receipt| DI["Azure AI<br/>Document Intelligence"]
+    DI -->|AnalyzeResult| AZ --> P
+    P --> A --> UI
+    P --> E --> UI
+    P --> S
+    UI -. optional .-> ID["Microsoft Entra ID<br/>(OIDC login)"]
+```
 
-3.  **Configura l'Autenticazione con Microsoft Azure Entra ID:**
+The code is split so that everything in `invoice_extractor/` is plain Python with **no Streamlit import**.
+That keeps the logic unit-testable, and the UI layer only wires widgets to these functions.
 
-    *   **Registra un'applicazione in Azure Active Directory (Azure AD):** Segui la documentazione Microsoft per registrare un'applicazione in Azure AD. Otterrai un *Client ID* e dovrai generare un *Client Secret*. Imposta l'URL di reindirizzamento (Redirect URI) dell'applicazione a `http://localhost:8501` (o l'URL dove la tua applicazione Streamlit sarà accessibile).  Se l'app è in produzione, usa l'URL di produzione.
+```
+app.py                     entry point: page config, language, login, navigation
+ui/
+  common.py                settings, login gate, result editor (fields, items, preview, download)
+  extract_page.py          upload and analysis page
+  history_page.py          history page
+invoice_extractor/
+  config.py                settings from environment variables / .env
+  files.py                 upload validation, image to PDF conversion
+  azure_client.py          Document Intelligence calls, readable error messages
+  parsing.py               raw result to fields, line items and bounding boxes
+  annotate.py              renders page 1 and draws the boxes
+  export.py                JSON export with translated keys
+  storage.py               SQLite history (per user, last N entries)
+  pipeline.py              validate -> analyse -> parse, and the demo sample loader
+  i18n.py                  UI strings (EN / IT / ES)
+sample_data/               fictional sample invoice + pre-computed result for demo mode
+scripts/                   sample generator and a helper to record real Azure responses
+tests/                     pytest suite
+```
 
-    *   **Configura `secrets.toml`:** Crea una directory `.streamlit` (se non esiste) nella directory principale del tuo progetto. All'interno di `.streamlit`, crea un file chiamato `secrets.toml`.
+## Run it locally
 
-    *   **Aggiungi le credenziali Azure AD a `secrets.toml`:**  Questo file conterrà le credenziali per l'autenticazione.  **Non committare questo file in un repository pubblico!**
+Requires Python 3.11 or newer.
 
-        ```toml
-        [experimental.user]
-        client_id = "YOUR_CLIENT_ID"  # Sostituisci con il Client ID della tua app Azure AD
-        tenant_id = "YOUR_TENANT_ID"  #Sostituisci con il Tenant ID della tua app Azure AD
-        cookie_secret = ""  #Inserisci una stringa qualsiasi
-        client_secret = "YOUR_CLIENT_SECRET"  # Sostituisci con il Client Secret generato
-        redirect_uri = "http://localhost:8501" #Sostituisci con il corretto redirect URI
-        server_metadata_url = "YOUR_SERVER_URL"  #Sostituisci con il corretto URL del server metadata Microsoft   #Es.   https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0/.well-known/openid-configuration
-        allowed_emails = ["your_email@example.com", "another_email@example.com"] # opzionale: lista di email autorizzate
-        ```
+```bash
+git clone https://github.com/emamira02/Extract_invoices.git
+cd Extract_invoices
+python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+streamlit run app.py
+```
 
-        *   Sostituisci `YOUR_CLIENT_ID`, `YOUR_TENANT_ID`, `YOUR_CLIENT_SECRET`, `YOUR_SERVER_URL`, `http://localhost:8501` con i valori corretti.
-        *   La sezione `allowed_emails` è opzionale. Se presente, solo gli utenti con gli indirizzi email elencati potranno accedere all'applicazione.
+Open http://localhost:8501. With no configuration the app starts in **demo mode**:
+click *Try the sample invoice* to see a full result.
 
-4.  **Configura Tesseract OCR (Importante per una Migliore Qualità OCR):**
+### Use your own Azure resource
 
-    *   Anche se l'applicazione utilizza l'OCR Tesseract integrato in PyMuPDF, puoi migliorare significativamente la precisione dell'OCR installando Tesseract sulla tua macchina host e fornendo il percorso alla sua directory `tessdata`.
+1. In the Azure portal, create a **Document Intelligence** resource (the free F0 tier is enough to try it).
+2. Copy `.env.example` to `.env` and fill in the two values from *Keys and Endpoint*:
 
-    *   **Installa Tesseract:** Segui le istruzioni di installazione per il tuo sistema operativo. I metodi comuni includono:
+   ```ini
+   AZURE_DOCINTEL_ENDPOINT=https://<your-resource>.cognitiveservices.azure.com/
+   AZURE_DOCINTEL_KEY=<your key>
+   ```
+3. Restart the app. Uploading is now enabled.
 
-        *   **Windows:** Scarica l'installer da [UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki) e installalo. Assicurati di aggiungere Tesseract alla variabile di ambiente PATH del tuo sistema durante l'installazione.
-        *   **macOS:** `brew install tesseract` (se usi Homebrew)
-        *   **Linux:** `sudo apt-get install tesseract-ocr` (Debian/Ubuntu) or `sudo yum install tesseract` (CentOS/RHEL)
+Keys are only read from the environment. `.env` and `.streamlit/secrets.toml` are git-ignored.
 
-    *   **Individua la directory `tessdata`:** Questa directory contiene i file di dati linguistici necessari per Tesseract. Il percorso tipico è:
+### Enable Microsoft login (optional)
 
-        *   **Windows:** `C:\Program Files\Tesseract-OCR\tessdata`
-        *   **macOS:** `/usr/local/share/tessdata` (se installato con Homebrew)
-        *   **Linux:** `/usr/share/tesseract-ocr/tessdata`
+1. Register an app in **Microsoft Entra ID** and add the redirect URI `http://localhost:8501/oauth2callback`.
+2. Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and fill in the client ID, secret and tenant.
+3. Optionally set `ALLOWED_EMAILS` in `.env` to restrict access.
 
-    *   **Imposta la variabile d'ambiente `TESSDATA_PREFIX`:** Nel file `.env` (crealo se non esiste nella directory principale del progetto), aggiungi la seguente riga, sostituendo il percorso con quello corretto per il tuo sistema:
+Without an `[auth]` section the app runs without login.
 
-        ```
-        TESSDATA_PREFIX = /usr/local/share/tessdata/
-        ```
+### Docker
 
-        Assicurati che il percorso sia corretto. Se non è impostato o è errato, l'OCR potrebbe non funzionare correttamente.
+```bash
+cp .env.example .env        # add your Azure values, or leave empty for demo mode
+docker compose up --build
+```
 
-5.  **Installa le dipendenze Python:**
+## Tests
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
 
-6. **Crea la directory `temp_files`:**
-    L'applicazione salva temporaneamente i file caricati nella directory `temp_files`. Assicurati che questa directory esista. Puoi crearla manualmente o l'applicazione la creerà al primo avvio.
+The tests cover number parsing in Italian and English formats, parsing a full invoice + receipt result,
+file validation (wrong type, empty, corrupted, too large, image to PDF) and the history store.
+They use JSON fixtures, so they need no Azure key. GitHub Actions runs them on every push.
 
-7.  **Crea l'immagine Docker (nella directory principale del progetto):**
+## Deploy on Streamlit Community Cloud
 
-    ```bash
-    docker build -t data-extractor .
-    ```
+1. Push the repository to GitHub.
+2. On [share.streamlit.io](https://share.streamlit.io) choose **Create app**, pick this repo and branch, and set the main file to `app.py`.
+3. Deploy. With no secrets the app runs in demo mode, which is safe to share publicly.
+4. To enable real uploads, open **Settings > Secrets** and add:
 
-8.  **Esegui il container Docker:**
+   ```toml
+   AZURE_DOCINTEL_ENDPOINT = "https://<your-resource>.cognitiveservices.azure.com/"
+   AZURE_DOCINTEL_KEY = "<your key>"
+   ```
 
-    ```bash
-    docker-compose up -d
-    ```
+   If you do this on a public app, also enable Microsoft login (add the `[auth]` block with the
+   redirect URI `https://<your-app>.streamlit.app/oauth2callback`) so strangers cannot spend your Azure quota.
 
-## Utilizzo
+## Notes and limitations
 
-1.  Apri il browser e vai all'indirizzo `http://localhost:8501`.
-2.  Effettua il login con il tuo account Microsoft Azure Entra ID.
-3.  Carica un file di fattura o ricevuta in formato PDF, JPG, JPEG o PNG.
-4.  Attendi che l'applicazione analizzi il documento ed estragga i dati.
-5.  Visualizza e modifica i dati estratti nell'interfaccia utente.
-6.  Scarica i dati in formato JSON.
-7.  Esplora la cronologia delle analisi nel pannello laterale per rivedere e scaricare analisi precedenti.
-
-## Note
-
-*   Per un corretto funzionamento del login di Microsoft, assicurati di aver configurato correttamente il file `.streamlit/secrets.toml` con il Client ID, Client Secret e Redirect URI corretti.
-*   L'accuratezza dell'estrazione dei dati dipende dalla qualità del documento di input e dalle capacità del modello Azure AI Document Intelligence.
-*   Se l'OCR non funziona correttamente, verifica che `TESSDATA_PREFIX` sia impostato correttamente e che i file di dati linguistici di Tesseract siano presenti nella directory specificata.
-* Il modello prebuilt-receipt nel backend, viene utilizzato per estrapolare solo il `MerchantPhoneNumber` e il `TransactionTime`, qualora siano presenti nel documento, poichè il modello prebuilt-invoice non li estrae.
-*   L'applicazione memorizza un massimo di 10 analisi. Le analisi più vecchie vengono eliminate automaticamente per fare spazio a nuove.
-
-## Risoluzione dei problemi
-
-*   **Errore di autenticazione:** Verifica che le impostazioni di Azure Active Directory siano configurate correttamente e che il file `secrets.toml` contenga il Client ID, Client Secret e Redirect URI corretti. Verifica anche che l'URL di reindirizzamento nell'applicazione Azure AD corrisponda a quello configurato in `secrets.toml`.
-*   **Errore di estrazione dei dati:** Verifica che la chiave API e l'endpoint di Azure AI Document Intelligence siano corretti nel file `client.ini` e che la risorsa sia attiva nella tua sottoscrizione Azure.
-*   **OCR non funzionante:** Verifica che la variabile d'ambiente `TESSDATA_PREFIX` sia impostata correttamente e che i file di dati linguistici di Tesseract siano presenti nella directory specificata.  Assicurati che PyMuPDF sia configurato correttamente per utilizzare Tesseract.
-*   **Errore di download:** Verifica i log dell'applicazione per identificare eventuali errori durante la creazione del link di download. Controlla i permessi di scrittura se stai usando Docker.
-*   **Problemi con la visualizzazione dei dati evidenziati:** Assicurati che PyMuPDF e le sue dipendenze siano installate correttamente. Controlla i log per eventuali errori durante l'elaborazione dell'immagine.
-* **Cronologia non funzionante:** Verifica che il database SQLite (`cronologia.db`) sia creato correttamente e che l'applicazione abbia i permessi di scrittura necessari.
+- Bounding boxes are drawn on the first page only; all pages are sent to Azure.
+- The demo result in `sample_data/` is **not** real Azure output: it is generated by
+  `scripts/make_sample_invoice.py` in the same format, for a fictional company.
+  `scripts/record_analysis.py` can replace it with a real response from your resource.
+- On Streamlit Community Cloud the SQLite history is reset whenever the app restarts.
